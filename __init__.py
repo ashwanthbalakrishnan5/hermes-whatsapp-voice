@@ -17,7 +17,7 @@ def register(ctx):
         except Exception:  # noqa: BLE001 - availability checks must never raise
             return False
 
-    call_owner, call_status = tools.make_handlers(ctx)
+    call_owner, call_status, call_contact, contacts = tools.make_handlers(ctx)
     ctx.register_tool(
         name="whatsapp_call_owner",
         toolset="whatsapp_voice",
@@ -25,6 +25,22 @@ def register(ctx):
         handler=call_owner,
         check_fn=available,
         emoji="📞",
+    )
+    ctx.register_tool(
+        name="whatsapp_call_contact",
+        toolset="whatsapp_voice",
+        schema=tools.CALL_CONTACT,
+        handler=call_contact,
+        check_fn=lambda: available() and bool(ctx.get_config("contact_calls", default=False)),
+        emoji="📲",
+    )
+    ctx.register_tool(
+        name="whatsapp_voice_contacts",
+        toolset="whatsapp_voice",
+        schema=tools.CONTACTS,
+        handler=contacts,
+        check_fn=available,
+        emoji="📇",
     )
     ctx.register_tool(
         name="whatsapp_call_status",

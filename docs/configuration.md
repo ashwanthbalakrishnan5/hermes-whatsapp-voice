@@ -14,6 +14,11 @@ Restart the sidecar after a change: the dashboard's **Restart sidecar** button, 
 | key | default | |
 |---|---|---|
 | `owner_number` | (required) | Your number, international format |
+| `owner_name` | (empty) | How the voice names you when it calls someone else for you |
+| `contact_calls` | `false` | Allow calls to saved contacts on your behalf |
+| `confirm_contact_calls` | `true` | Ask you for a yes before each call to someone else |
+| `allow_unsaved_numbers` | `false` | Allow calling numbers that are not in the address book |
+| `max_calls_per_contact_per_day` | `3` | Rate limit per contact |
 | `voice_model` | `gemini-3.8-live` | Gemini Live model |
 | `voice` | `Kore` | Gemini prebuilt voice |
 | `assistant_name` | `Hermes` | Fallback name when Hermes gives no persona briefing |

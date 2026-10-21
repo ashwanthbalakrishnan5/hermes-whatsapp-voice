@@ -9,6 +9,8 @@ import platform
 import secrets
 import shutil
 import subprocess
+import time
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -23,6 +25,11 @@ PLUGIN_DIR = Path(__file__).resolve().parent
 # Settings forwarded to the sidecar, with the defaults from plugin.yaml.
 SETTINGS: dict[str, Any] = {
     "owner_number": "",
+    "owner_name": "",
+    "contact_calls": False,
+    "confirm_contact_calls": True,
+    "allow_unsaved_numbers": False,
+    "max_calls_per_contact_per_day": 3,
     "voice_model": "gemini-3.8-live",
     "voice": "Kore",
     "assistant_name": "Hermes",
@@ -145,6 +152,7 @@ def sidecar_env(ctx) -> dict[str, str]:
     s = settings(ctx)
     env = {
         "HWV_OWNER": str(s["owner_number"]),
+        "HWV_OWNER_NAME": str(s["owner_name"] or ""),
         "HWV_MODEL": str(s["voice_model"]),
         "HWV_VOICE": str(s["voice"]),
         "HWV_ASSISTANT_NAME": str(s["assistant_name"]),
@@ -199,11 +207,99 @@ class Client:
     def health(self) -> dict:
         return self._request("GET", "/health")
 
-    def start_call(self, reason: str, details: str = "") -> dict:
-        return self._request("POST", "/calls", {"reason": reason, "details": details})
+    def start_call(
+        self, reason: str, details: str = "", to: str = "", contact_name: str = "", language: str = ""
+    ) -> dict:
+        body = {"reason": reason, "details": details}
+        if to:
+            body["to"] = to
+            body["contact_name"] = contact_name
+            if language:
+                body["language"] = language
+        return self._request("POST", "/calls", body)
 
     def get_call(self, call_id: str) -> dict:
         return self._request("GET", f"/calls/{urllib.parse.quote(call_id, safe='')}")
 
     def recent_calls(self, limit: int = 5) -> list[dict]:
         return self._request("GET", f"/calls?limit={limit}").get("calls", [])
+
+
+# ---------------------------------------------------------------------------
+# Address book for calls to people other than the owner ("call mom").
+# Kept in the plugin's data dir as {"anne": {"name": "Annem", "number": "905..."}}.
+
+
+def _contacts_path() -> Path:
+    return data_dir() / "contacts.json"
+
+
+def contact_key(name: str) -> str:
+    """Case- and accent-insensitive key ("Zoë" == "zoe", "İpek" == "ipek")."""
+    folded = unicodedata.normalize("NFKD", name.replace("ı", "i").replace("İ", "I")).casefold()
+    return " ".join("".join(ch for ch in folded if not unicodedata.combining(ch)).split())
+
+
+def load_contacts() -> dict[str, dict]:
+    path = _contacts_path()
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text())
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def save_contacts(contacts: dict[str, dict]) -> None:
+    path = _contacts_path()
+    tmp = path.with_suffix(".tmp")
+    with os.fdopen(os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w") as f:
+        json.dump(contacts, f, ensure_ascii=False, indent=2)
+    tmp.replace(path)
+
+
+def normalize_number(raw: str) -> str:
+    """Digits only, international format (a leading 00 is dropped). Local formats are not guessed."""
+    digits = "".join(ch for ch in str(raw) if ch.isdigit())
+    digits = digits.removeprefix("00")
+    return digits
+
+
+def _usage_path() -> Path:
+    return data_dir() / "contact_calls.json"
+
+
+def calls_today(number: str) -> int:
+    today = time.strftime("%Y-%m-%d")
+    try:
+        data = json.loads(_usage_path().read_text())
+    except (OSError, ValueError):
+        return 0
+    return int(data.get(today, {}).get(number, 0))
+
+
+def record_call(number: str) -> None:
+    today = time.strftime("%Y-%m-%d")
+    try:
+        data = json.loads(_usage_path().read_text())
+    except (OSError, ValueError):
+        data = {}
+    day = {k: v for k, v in data.items() if k == today}.get(today, {})
+    day[number] = int(day.get(number, 0)) + 1
+    _usage_path().write_text(json.dumps({today: day}))
+
+
+def find_contact(name: str) -> dict | None:
+    """Exact key, then aliases, then a unique prefix match ("annem" -> "anne")."""
+    contacts = load_contacts()
+    key = contact_key(name)
+    if not key:
+        return None
+    if key in contacts:
+        return contacts[key]
+    for entry in contacts.values():
+        if key in (contact_key(a) for a in entry.get("aliases", [])):
+            return entry
+    hits = [e for k, e in contacts.items() if key.startswith(k) or k.startswith(key)]
+    return hits[0] if len(hits) == 1 else None
