@@ -10,6 +10,8 @@ use anyhow::{Context, Result, bail};
 pub struct Config {
     /// Owner's phone number, digits only.
     pub owner: String,
+    /// How the voice names the owner to other people ("Sam"); empty: "the owner".
+    pub owner_name: String,
     pub listen: String,
     pub token: String,
     pub gemini_api_key: String,
@@ -102,6 +104,7 @@ impl Config {
         }
         Ok(Self {
             owner,
+            owner_name: var("HWV_OWNER_NAME", ""),
             listen,
             token: required("HWV_TOKEN")?,
             gemini_api_key: required("GEMINI_API_KEY")?,

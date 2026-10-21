@@ -7,6 +7,9 @@ Live voice calls with [Hermes](https://github.com/NousResearch/hermes-agent) ove
 - **Let Hermes call you.** For things that matter, Hermes can ring you instead of sending a message:
   a top-priority reminder, an urgent alert, a cron job that needs a decision. If you don't pick up,
   the tool says so and Hermes falls back to another channel.
+- **Let Hermes call other people for you** (opt-in). Hermes can phone the people in your address
+  book on your behalf, hold the conversation in their language, and report back. See
+  [Calling other people](#calling-other-people-opt-in).
 - **Summary afterwards.** When a call ends, Hermes digests the transcript and sends you a short
   summary in WhatsApp.
 
@@ -67,7 +70,8 @@ hermes plugins install ashwanthbalakrishnan5/hermes-whatsapp-voice --enable
 
 ### 1. Set your number
 
-This is the only number that will ever be called, and the only caller that will be answered.
+This is the only caller that will be answered, and the only number called unless you turn on
+[calls to other people](#calling-other-people-opt-in).
 
 ```bash
 hermes config set plugins.entries.hermes-whatsapp-voice.settings.owner_number +15551234567
@@ -138,6 +142,55 @@ hermes cron create "0 9 * * 1-5" \
 The tool waits until the call is answered, declined or unanswered, and returns that status. On
 `no_answer`/`rejected`/`failed` it tells the agent to use another channel.
 
+## Calling other people (opt-in)
+
+With `contact_calls` on, your agent becomes a real phone assistant. You tell Hermes what you need in
+chat, and it calls the right person, has the conversation, and sends you the answer:
+
+- **You're in a meeting and someone calls.** You can't pick up, so you text Hermes: *"Call Sam back,
+  tell him I'm in a meeting and I'll call him after 4."* Hermes calls Sam, passes on the message,
+  asks if it's urgent, and tells you what he said.
+- **Order dinner.** *"Call the pizza place, order a large margherita for 8 pm, and ask how long it
+  takes."*
+- **Organise a meeting.** *"Call Alex and Priya and find a time on Thursday afternoon that works for
+  both."* Hermes calls them one after the other and reports the slot that fits.
+- **Keep family in the loop.** *"Call mom, tell her the flight lands at 6, and ask what she'd like
+  for dinner."* Each contact can have their own language (say `ru-RU` for a Russian-speaking
+  relative), so Hermes speaks to them in theirs and reports back to you in yours.
+- **Quick checks.** *"Call the garage and ask if the car is ready."*
+
+How it behaves on the call:
+
+- It says up front that it is an AI assistant calling on your behalf, and never pretends to be human.
+- It goes through the task one step at a time: one message or one question per turn, waits for the
+  answer, and comes back once to a question that was skipped.
+- It only does the task you gave. On these calls it has **no** `ask_hermes`, no access to your memory,
+  files or tools, and it won't share private details beyond what the task needs. Anything the other
+  person asks for is passed on to you instead.
+- If the line is busy with another call (you're talking to Hermes yourself, say), the call is queued
+  and placed as soon as the line is free.
+- Afterwards you get a WhatsApp report: did it reach them, and what exactly they answered.
+
+Safety rails, all configurable:
+
+| Setting | Default | What it does |
+|---|---|---|
+| `contact_calls` | `false` | The whole feature. Off: the tool is hidden and nobody but you is ever called. |
+| `allow_unsaved_numbers` | `false` | Off: only saved contacts can be called, so a prompt injection can't make the agent dial an arbitrary number. |
+| `confirm_contact_calls` | `true` | The agent must ask you on WhatsApp and get a yes before each call. |
+| `max_calls_per_contact_per_day` | `3` | Rate limit per person. |
+
+Requests coming from group chats are refused. Contacts are saved from your private chat ("save
+mom as +44 7700 900123, she speaks English") with `whatsapp_voice_contacts`, or from the CLI:
+
+```bash
+hermes whatsapp-voice call "Tell Sam I'm running 10 minutes late" --to +15551234567 --name Sam
+```
+
+Before you turn this on, check the rules for AI calls and call recording in your country and the
+callee's. A number your contact has not saved may be silenced by WhatsApp's "Silence unknown
+callers" setting, so ask the people you call often to save the bot's number.
+
 ## Configure
 
 Everything is configurable from the **WhatsApp Voice** tab in the Hermes dashboard, the Desktop
@@ -169,8 +222,10 @@ voice takes its name and personality from your own Hermes. Full reference:
     dashboard's Pair button).
 
   Nothing else, and no telemetry.
-- **Who it talks to.** It only answers calls from `owner_number` and only calls `owner_number`.
-  Neither tool takes a destination parameter, so a prompt injection cannot make it call anyone else.
+- **Who it talks to.** It only answers calls from `owner_number`. By default it only calls
+  `owner_number`: `whatsapp_call_owner` takes no destination parameter. Calls to anyone else need
+  `contact_calls` turned on, and are limited to saved contacts, confirmed by you and rate limited
+  unless you change those settings (see [Calling other people](#calling-other-people-opt-in)).
   Calls from other numbers are left alone, so the bot's other devices can still take them.
 - **Commands it runs.**
   - The dashboard tab's backend (inside the Hermes dashboard, behind its login): `hermes config

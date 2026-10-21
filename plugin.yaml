@@ -16,6 +16,8 @@ platforms: [linux, macos]
 requires_hermes: ">=0.21.5"
 provides_tools:
   - whatsapp_call_owner
+  - whatsapp_call_contact
+  - whatsapp_voice_contacts
   - whatsapp_call_status
 # Gemini: reuses the key of Hermes's own Gemini provider (GOOGLE_API_KEY, else GEMINI_API_KEY).
 optional_env:
@@ -33,6 +35,31 @@ config_schema:
     required: true
     label: "Your WhatsApp number"
     description: "International format, e.g. +15551234567. The only number called, and the only caller answered."
+  owner_name:
+    type: str
+    default: ""
+    label: "Your name"
+    description: "How the voice introduces you when it calls someone else for you, e.g. Sam."
+  contact_calls:
+    type: bool
+    default: false
+    label: "Calls to other people"
+    description: "Let your agent call saved contacts on your behalf (whatsapp_call_contact). Off by default. Check the AI-call and recording rules in your country and the callee's."
+  confirm_contact_calls:
+    type: bool
+    default: true
+    label: "Confirm before calling someone"
+    description: "The agent must ask you on WhatsApp and get a yes before each call to another person."
+  allow_unsaved_numbers:
+    type: bool
+    default: false
+    label: "Allow numbers that are not in the address book"
+    description: "Off: only saved contacts can be called, so a prompt injection cannot make the agent dial an arbitrary number."
+  max_calls_per_contact_per_day:
+    type: int
+    default: 3
+    label: "Calls per contact per day"
+    description: "Upper limit on calls to the same person in one day."
   voice_model:
     type: str
     default: "gemini-3.8-live"

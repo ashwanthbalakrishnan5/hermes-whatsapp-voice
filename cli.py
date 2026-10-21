@@ -131,9 +131,16 @@ def _status(ctx) -> None:
         raise SystemExit(str(e)) from e
 
 
-def _call(ctx, reason: str) -> None:
+def _call(ctx, reason: str, to: str | None = None, name: str = "", language: str = "") -> None:
+    from .sidecar_client import normalize_number
+
     try:
-        print(json.dumps(Client.from_ctx(ctx).start_call(reason), indent=2))
+        target = normalize_number(to) if to else ""
+        print(
+            json.dumps(
+                Client.from_ctx(ctx).start_call(reason, to=target, contact_name=name, language=language), indent=2
+            )
+        )
     except SidecarError as e:
         raise SystemExit(str(e)) from e
 
@@ -149,6 +156,9 @@ def setup_parser(subparser) -> None:
     subs.add_parser("status", help="Show sidecar health")
     call = subs.add_parser("call", help="Place a test call to the owner")
     call.add_argument("reason", nargs="?", default="This is a quick test call.")
+    call.add_argument("--to", help="Call this number instead of the owner (on the owner's behalf)")
+    call.add_argument("--name", default="", help="How to refer to the person called with --to")
+    call.add_argument("--lang", default="", help="Language code for the person called with --to, e.g. ru-RU")
 
 
 def make_handler(ctx):
@@ -165,7 +175,7 @@ def make_handler(ctx):
         elif cmd == "status":
             _status(ctx)
         elif cmd == "call":
-            _call(ctx, args.reason)
+            _call(ctx, args.reason, getattr(args, "to", None), getattr(args, "name", ""), getattr(args, "lang", ""))
         else:
             print("Usage: hermes whatsapp-voice {install,pair,serve,service,status,call}", file=sys.stderr)
 

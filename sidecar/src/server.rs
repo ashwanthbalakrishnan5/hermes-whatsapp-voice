@@ -10,7 +10,8 @@ use axum::{Json, Router};
 use serde::Deserialize;
 use serde_json::json;
 
-use crate::calls::Bridge;
+use crate::calls::{Bridge, Target};
+use crate::config::digits;
 
 type ApiResult = Result<Response, (StatusCode, Json<serde_json::Value>)>;
 
@@ -50,6 +51,14 @@ struct StartCall {
     reason: String,
     #[serde(default)]
     details: String,
+    /// Someone other than the owner to call (international number). Omit to call the owner.
+    #[serde(default)]
+    to: Option<String>,
+    #[serde(default)]
+    contact_name: Option<String>,
+    /// Language code for the callee, e.g. ru-RU.
+    #[serde(default)]
+    language: Option<String>,
 }
 
 async fn start_call(
@@ -68,15 +77,63 @@ async fn start_call(
             "not connected to WhatsApp",
         ));
     }
+    let target = match body.to.as_deref().map(str::trim).filter(|t| !t.is_empty()) {
+        None => None,
+        Some(raw) => {
+            let number = digits(raw);
+            if number.len() < 8 || number.len() > 15 {
+                return Err(error(
+                    StatusCode::BAD_REQUEST,
+                    "`to` must be a full international phone number, e.g. +905551234567",
+                ));
+            }
+            Some(Target {
+                name: body
+                    .contact_name
+                    .clone()
+                    .unwrap_or_default()
+                    .trim()
+                    .to_string(),
+                language: body
+                    .language
+                    .clone()
+                    .map(|l| l.trim().to_string())
+                    .filter(|l| !l.is_empty())
+                    .unwrap_or_else(|| contact_language(&number)),
+                number,
+            })
+        }
+    };
     let record = bridge
-        .begin_outbound(&reason)
+        .begin_outbound(&reason, target.as_ref())
         .map_err(|e| error(StatusCode::CONFLICT, e.to_string()))?;
     tokio::spawn(bridge.clone().run_outbound(
         record.id.clone(),
         reason,
         body.details.trim().to_string(),
+        target,
     ));
     Ok((StatusCode::ACCEPTED, Json(record)).into_response())
+}
+
+/// The saved language for a number in the plugin's address book (contacts.json), if any.
+fn contact_language(number: &str) -> String {
+    let Ok(dir) = crate::config::Config::data_dir() else {
+        return String::new();
+    };
+    let Ok(raw) = std::fs::read_to_string(dir.join("contacts.json")) else {
+        return String::new();
+    };
+    let Ok(book) = serde_json::from_str::<serde_json::Value>(&raw) else {
+        return String::new();
+    };
+    book.as_object()
+        .into_iter()
+        .flat_map(|m| m.values())
+        .find(|e| e["number"].as_str() == Some(number))
+        .and_then(|e| e["language"].as_str())
+        .map(|l| l.trim().to_string())
+        .unwrap_or_default()
 }
 
 #[derive(Deserialize)]

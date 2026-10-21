@@ -25,7 +25,12 @@ def _call(ctx, name, args):
 def test_registers_declared_tools_and_cli(plugin):
     ctx = FakeCtx()
     plugin.register(ctx)
-    assert set(ctx.tools) == {"whatsapp_call_owner", "whatsapp_call_status"}
+    assert set(ctx.tools) == {
+        "whatsapp_call_owner",
+        "whatsapp_call_status",
+        "whatsapp_call_contact",
+        "whatsapp_voice_contacts",
+    }
     assert "whatsapp-voice" in ctx.cli
     assert "setup" in ctx.skills
     # Unconfigured: tools stay hidden from the model.
@@ -191,3 +196,97 @@ def test_dashboard_settings_reject_unknown_keys_and_wrong_types(plugin, monkeypa
         [prefix + "answer_inbound", "false"],
         [prefix + "live_config", '{"a": {}}'],
     ]
+
+
+def _contacts_on(plugin, sidecar, **extra):
+    return _setup(plugin, sidecar, contact_calls=True, **extra)
+
+
+def test_contact_tool_hidden_until_enabled(plugin):
+    sidecar = FakeSidecar(["ringing"])
+    try:
+        ctx = _setup(plugin, sidecar)
+        assert ctx.tools["whatsapp_call_contact"]["check_fn"]() is False
+        out = _call(ctx, "whatsapp_call_contact", {"contact": "sam", "task": "x"})
+        assert "turned off" in out["error"]
+        assert _contacts_on(plugin, sidecar).tools["whatsapp_call_contact"]["check_fn"]() is True
+    finally:
+        sidecar.close()
+
+
+def test_contact_book_confirmation_and_call(plugin, no_sleep):
+    sidecar = FakeSidecar(["ringing", "in_progress"])
+    try:
+        ctx = _contacts_on(plugin, sidecar)
+        saved = _call(
+            ctx,
+            "whatsapp_voice_contacts",
+            {
+                "action": "save",
+                "name": "Mom",
+                "number": "+1 555 111 2233",
+                "display_name": "Mom",
+                "aliases": ["my mother"],
+            },
+        )
+        assert saved["saved"]["number"] == "15551112233"
+        assert _call(ctx, "whatsapp_voice_contacts", {"action": "list"})["contacts"][0]["key"] == "mom"
+        args = {"contact": "MY MOTHER", "task": "Ask what she wants for dinner."}
+        first = _call(ctx, "whatsapp_call_contact", args)
+        assert first["status"] == "confirmation_required"
+        assert not [r for r in sidecar.requests if r[0] == "POST"], "no dialing before the owner says yes"
+        out = _call(ctx, "whatsapp_call_contact", {**args, "owner_confirmed": True})
+        assert out["status"] == "in_progress"
+        post = next(r for r in sidecar.requests if r[0] == "POST")
+        assert post[2]["to"] == "15551112233"
+        assert post[2]["contact_name"] == "Mom"
+    finally:
+        sidecar.close()
+
+
+def test_contact_calls_refuse_unsaved_unknown_and_owner(plugin, no_sleep):
+    sidecar = FakeSidecar(["ringing"])
+    try:
+        ctx = _contacts_on(plugin, sidecar)
+        assert (
+            "Only saved contacts"
+            in _call(ctx, "whatsapp_call_contact", {"number": "+44 20 7946 0000", "task": "x"})["error"]
+        )
+        assert "No saved contact" in _call(ctx, "whatsapp_call_contact", {"contact": "aunt", "task": "x"})["error"]
+        ctx = _contacts_on(plugin, sidecar, allow_unsaved_numbers=True)
+        assert (
+            "owner's own number"
+            in _call(ctx, "whatsapp_call_contact", {"number": "+1 555 123 4567", "task": "x"})["error"]
+        )
+        assert "full phone number" in _call(ctx, "whatsapp_call_contact", {"number": "123", "task": "x"})["error"]
+        assert not [r for r in sidecar.requests if r[0] == "POST"]
+    finally:
+        sidecar.close()
+
+
+def test_contact_daily_limit(plugin, no_sleep):
+    sidecar = FakeSidecar(["ringing", "in_progress"])
+    try:
+        ctx = _contacts_on(plugin, sidecar, confirm_contact_calls=False, max_calls_per_contact_per_day=1)
+        _call(ctx, "whatsapp_voice_contacts", {"action": "save", "name": "Sam", "number": "+1 555 999 0000"})
+        assert _call(ctx, "whatsapp_call_contact", {"contact": "sam", "task": "x"})["status"] == "in_progress"
+        assert "Daily limit" in _call(ctx, "whatsapp_call_contact", {"contact": "sam", "task": "x"})["error"]
+    finally:
+        sidecar.close()
+
+
+def test_contact_language_is_sent(plugin, no_sleep):
+    sidecar = FakeSidecar(["ringing", "in_progress"])
+    try:
+        ctx = _contacts_on(plugin, sidecar, confirm_contact_calls=False)
+        _call(
+            ctx,
+            "whatsapp_voice_contacts",
+            {"action": "save", "name": "Zoë", "number": "+33 6 12 34 56 78", "language": "fr-FR"},
+        )
+        _call(ctx, "whatsapp_call_contact", {"contact": "zoe", "task": "Ask about dinner."})
+        post = next(r for r in sidecar.requests if r[0] == "POST")
+        assert post[2]["language"] == "fr-FR"
+        assert post[2]["to"] == "33612345678"
+    finally:
+        sidecar.close()
