@@ -10,6 +10,7 @@ mod calls;
 mod config;
 mod gemini;
 mod hermes;
+mod owner;
 mod server;
 
 use std::sync::Arc;

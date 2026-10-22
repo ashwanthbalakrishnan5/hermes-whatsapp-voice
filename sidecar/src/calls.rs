@@ -350,29 +350,43 @@ impl Bridge {
         Jid::pn(self.cfg.owner.as_str())
     }
 
-    /// Whether an incoming offer comes from the owner's number.
+    /// Query only the configured owner PN. Never infer Brazilian number aliases or trust an
+    /// inbound LID as the owner. WhatsApp's authenticated response supplies the canonical pair.
+    pub(crate) async fn resolve_owner(&self) -> Result<(Jid, Jid)> {
+        let results = tokio::time::timeout(
+            Duration::from_secs(25),
+            self.client.contacts().is_on_whatsapp(&[self.owner_jid()]),
+        )
+        .await??;
+        if results.len() != 1 {
+            bail!("owner lookup returned an ambiguous or empty response");
+        }
+        let result = &results[0];
+        let pn = result.pn_jid.as_ref().unwrap_or(&result.jid);
+        crate::owner::verified_identity(
+            result.is_registered,
+            pn,
+            result.lid.as_ref(),
+            result.contact_error.is_some() || result.lid_error.is_some(),
+        )
+    }
+
+    /// Accept only identities from a fresh authenticated lookup of the configured PN.
     pub async fn is_owner(
         &self,
         call: &IncomingCall,
         creator: &Jid,
         caller_pn: Option<&Jid>,
     ) -> bool {
-        for jid in caller_pn.into_iter().chain([creator, &call.from]) {
-            if jid.is_pn() {
-                return jid.user == self.cfg.owner;
+        let (pn, lid) = match self.resolve_owner().await {
+            Ok(identity) => identity,
+            Err(error) => {
+                log::warn!("owner verification failed closed: {error}");
+                return false;
             }
-        }
-        for jid in [creator, &call.from] {
-            if jid.is_lid()
-                && let Ok(Some(entry)) = self.client.get_lid_pn_entry(jid).await
-            {
-                return *entry.phone_number == *self.cfg.owner;
-            }
-        }
-        log::warn!(
-            "call from {creator}: no phone number known for this LID, so it cannot be matched to the owner"
-        );
-        false
+        };
+        let candidates: Vec<&Jid> = caller_pn.into_iter().chain([creator, &call.from]).collect();
+        crate::owner::owner_matches(&self.owner_jid(), &pn, &lid, &candidates)
     }
 
     /// Validates and registers an outbound call; the caller spawns `run_outbound`.
@@ -381,13 +395,24 @@ impl Bridge {
     }
 
     pub async fn run_outbound(self: Arc<Self>, id: String, reason: String, details: String) {
+        let (_, owner_lid) = match self.resolve_owner().await {
+            Ok(identity) => identity,
+            Err(error) => {
+                self.calls.finish(
+                    &id,
+                    Status::Failed,
+                    format!("owner resolution failed: {error}"),
+                );
+                return;
+            }
+        };
         let (mic_tx, mic_rx) = async_channel::bounded::<Vec<i16>>(8);
         let (spk_tx, spk_rx) = async_channel::bounded::<Vec<i16>>(64);
         self.ring_signals.start();
         let started = self
             .client
             .voip()
-            .call(&self.owner_jid())
+            .call(&owner_lid)
             .audio(mic_rx, spk_tx)
             .start()
             .await;
