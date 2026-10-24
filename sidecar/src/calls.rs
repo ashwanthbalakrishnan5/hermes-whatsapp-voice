@@ -23,7 +23,6 @@ use crate::hermes::Hermes;
 
 const KEEP_RECORDS: usize = 50;
 const FRAME_INTERVAL: Duration = Duration::from_millis(60);
-const HERMES_TIMEOUT: Duration = Duration::from_secs(180);
 const STILL_CONNECTED: &str = "(The call is still connected: the owner spoke after your goodbye. \
     Answer them, and call end_call again once they are done.)";
 
@@ -476,7 +475,7 @@ impl Bridge {
                 prompt,
                 "Reply in plain text only.",
                 "whatsapp-voice-briefing",
-                HERMES_TIMEOUT,
+                self.cfg.hermes_timeout,
             )
             .await
         {
@@ -559,6 +558,7 @@ impl Bridge {
         done: mpsc::UnboundedSender<(String, Value)>,
     ) -> JoinHandle<()> {
         let hermes = self.hermes.clone();
+        let hermes_timeout = self.cfg.hermes_timeout;
         let request = args["request"].as_str().unwrap_or_default().to_string();
         let (tool_id, session) = (id.to_string(), format!("whatsapp-voice-{call_id}"));
         tokio::spawn(async move {
@@ -569,7 +569,7 @@ impl Bridge {
                         with your voice agent. Do what is asked. Reply in one to three short, plain \
                         sentences that can be read aloud: no markdown, lists, links or emoji.";
                     match h
-                        .run(&request, instructions, &session, HERMES_TIMEOUT)
+                        .run(&request, instructions, &session, hermes_timeout)
                         .await
                     {
                         Ok(answer) => json!({"result": answer}),
@@ -738,7 +738,7 @@ impl Bridge {
                         &input,
                         "Reply in plain text only.",
                         &format!("whatsapp-voice-{id}"),
-                        HERMES_TIMEOUT,
+                        self.cfg.hermes_timeout,
                     )
                     .await
                 {
