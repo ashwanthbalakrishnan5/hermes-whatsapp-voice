@@ -79,6 +79,26 @@ config_schema:
     default: 180
     label: "Hang up after silence (seconds)"
     description: "Ends a call when nobody has spoken for this long, e.g. left on hold."
+  hangup_grace_seconds:
+    type: int
+    default: 3
+    label: "Hang up after goodbye (seconds)"
+    description: "Quiet time after the assistant's goodbye before it hangs up. Speaking in that time keeps the call going."
+  hermes_timeout_seconds:
+    type: int
+    default: 180
+    label: "Hermes time limit (seconds)"
+    description: "How long the voice waits for Hermes on one request (and for the call summary) before giving up."
+  max_silent_tools:
+    type: int
+    default: 5
+    label: "Tools before speaking"
+    description: "How many tools the voice may run in a row before it must tell you what it is doing."
+  record_calls:
+    type: bool
+    default: false
+    label: "Record my side of calls"
+    description: "Save your audio from each call as a WAV file in the plugin's data folder (recordings/), on this machine only. For testing and debugging; off by default."
   answer_inbound:
     type: bool
     default: true
@@ -119,6 +139,11 @@ config_schema:
     default: "127.0.0.1:8797"
     label: "Core session address"
     description: "core_session: loopback address of the plugin's context service."
+  voice_api_url:
+    type: str
+    default: "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent"
+    label: "Voice model endpoint"
+    description: "Gemini Live WebSocket URL. Change only to use a proxy."
   hermes_api_url:
     type: str
     default: "http://127.0.0.1:8642"

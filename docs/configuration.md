@@ -27,10 +27,15 @@ Restart the sidecar after a change: the dashboard's **Restart sidecar** button, 
 | `ring_timeout_seconds` | `45` | How long an outbound call rings |
 | `max_call_minutes` | `15` | Hard cap per call |
 | `silence_hangup_seconds` | `180` | End a call when nobody has spoken for this long (e.g. left on hold) |
+| `hangup_grace_seconds` | `3` | Quiet time after the assistant's goodbye before it hangs up; speaking in it keeps the call up |
+| `hermes_timeout_seconds` | `180` | How long the voice waits for Hermes on one request, and for the call summary |
+| `max_silent_tools` | `5` | Tools the voice may run in a row before it must tell you what it is doing |
+| `record_calls` | `false` | Save your side of each call as `recordings/<call id>.wav` in the plugin's data folder (this machine only) |
 | `answer_inbound` | `true` | Answer calls from `owner_number` |
 | `send_summary` | `true` | Message a summary after each call |
 | `listen` | `127.0.0.1:8796` | Sidecar API address (loopback) |
 | `context_listen` | `127.0.0.1:8797` | `core_session` service address (loopback) |
+| `voice_api_url` | Gemini Live endpoint | Advanced: the Live API WebSocket URL, for a proxy. The Gemini key is sent there |
 | `hermes_api_url` | `http://127.0.0.1:8642` | Hermes API server |
 
 **Every Gemini Live option.** `live_config` takes any field of the Live API's setup message and

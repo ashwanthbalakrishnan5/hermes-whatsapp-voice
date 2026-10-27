@@ -85,6 +85,18 @@ def test_call_status(plugin):
         sidecar.close()
 
 
+def test_calls_command_prints_recent_calls(plugin, capsys):
+    import argparse
+
+    sidecar = FakeSidecar(["completed"])
+    try:
+        ctx = _setup(plugin, sidecar)
+        plugin.cli.make_handler(ctx)(argparse.Namespace(wv_command="calls", limit=3))
+        assert json.loads(capsys.readouterr().out)[0]["id"] == "c1"
+    finally:
+        sidecar.close()
+
+
 def test_bad_token_is_reported(plugin):
     sidecar = FakeSidecar(["completed"], token="right")
     try:
@@ -106,6 +118,11 @@ def test_sidecar_env(plugin):
     assert env["HWV_LIVE_CONFIG"] == "{}"
     assert env["HWV_LANGUAGES"] == ""
     assert env["HWV_SILENCE_TIMEOUT"] == "180s"
+    assert env["HWV_HERMES_TIMEOUT"] == "180s"
+    assert env["HWV_HANGUP_GRACE"] == "3s"
+    assert env["HWV_MAX_SILENT_TOOLS"] == "5"
+    assert env["HWV_RECORD_CALLS"] == "false"
+    assert env["HWV_GEMINI_URL"].startswith("wss://")
     assert env["GEMINI_API_KEY"] == "gemini-test"
     assert env["HERMES_API_KEY"] == "hermes-test"
     # A token is minted once and reused.

@@ -162,6 +162,13 @@ def _call(ctx, reason: str) -> None:
         raise SystemExit(str(e)) from e
 
 
+def _calls(ctx, limit: int) -> None:
+    try:
+        print(json.dumps(Client.from_ctx(ctx).recent_calls(limit), indent=2))
+    except SidecarError as e:
+        raise SystemExit(str(e)) from e
+
+
 def setup_parser(subparser) -> None:
     subs = subparser.add_subparsers(dest="wv_command")
     install = subs.add_parser("install", help="Install the sidecar binary (release download, or build with Rust)")
@@ -173,6 +180,8 @@ def setup_parser(subparser) -> None:
     subs.add_parser("status", help="Show sidecar health")
     call = subs.add_parser("call", help="Place a test call to the owner")
     call.add_argument("reason", nargs="?", default="This is a quick test call.")
+    calls = subs.add_parser("calls", help="Show recent calls: transcript, end reason and timing metrics")
+    calls.add_argument("--limit", type=int, default=5)
 
 
 def make_handler(ctx):
@@ -190,7 +199,9 @@ def make_handler(ctx):
             _status(ctx)
         elif cmd == "call":
             _call(ctx, args.reason)
+        elif cmd == "calls":
+            _calls(ctx, args.limit)
         else:
-            print("Usage: hermes whatsapp-voice {install,pair,serve,service,status,call}", file=sys.stderr)
+            print("Usage: hermes whatsapp-voice {install,pair,serve,service,status,call,calls}", file=sys.stderr)
 
     return handle

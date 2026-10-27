@@ -167,6 +167,8 @@ voice takes its name and personality from your own Hermes. Full reference:
     it can write to Hermes's memory.
   - `github.com`, to download the sidecar binary on first `pair`/`serve`/`install` (or from the
     dashboard's Pair button).
+  - If you change `voice_api_url`, that address instead of Gemini's: it gets the Gemini key and
+    the call audio.
 
   Nothing else, and no telemetry.
 - **Who it talks to.** It only answers calls from `owner_number` and only calls `owner_number`.
@@ -180,6 +182,13 @@ voice takes its name and personality from your own Hermes. Full reference:
     `install --from-source`.
   - The setup skill (only when an agent follows it) appends `API_SERVER_ENABLED` and a generated
     `API_SERVER_KEY` to Hermes's `.env` if they're missing.
+- **Chat-session mode** (`context_mode: core_session`, off by default). `serve` also runs a
+  loopback service (`context_listen`, same token) inside Hermes's own process. For each call it
+  sends Gemini your WhatsApp chat's system prompt, recent history (`history_chars`) and the tool
+  schemas of `voice_tools`, runs the voice's tool calls through Hermes in that chat, and writes the
+  call into the chat. It relies on Hermes internals listed in `CORE_PATCHES.md`.
+- **Recordings** (`record_calls`, off by default) save your side of each call as a WAV file in the
+  plugin's private data folder. Nothing is uploaded; delete them any time.
 - **Secrets** are read through Hermes (`get_secret`) and passed to the sidecar in its environment.
   The plugin never reads `.env` itself. The sidecar's local API only binds to a loopback address.
 
@@ -198,8 +207,31 @@ voice takes its name and personality from your own Hermes. Full reference:
 python -m pip install -r requirements-dev.txt
 ruff check . && python -m pytest tests/ -q
 cd sidecar && cargo test
-GEMINI_API_KEY=... cargo test -- --ignored   # live round trip against Gemini
 ```
+
+### Testing calls
+
+`cargo test` runs whole calls through the real call code (`sidecar/src/calls/sim.rs`) against a fake
+phone, a fake Gemini Live server and a fake Hermes. The fakes speak the real wire formats, so each
+test scripts a situation that has broken calls before: a `goAway` or a dropped socket mid-call, a
+slow or cancelled tool, a hangup, a silent owner, the chat session being unavailable. It needs no
+keys, costs nothing and runs in CI on every PR.
+
+Every call (real or simulated) records how it went in `GET /calls` under `metrics`: time to the
+first audio, each reply delay, the longest silence, tool calls in a row without speaking, token
+usage and who ended the call. After a real call that went wrong, read those first.
+
+The real model is tested only on request, since it costs money (a few cents a run):
+
+```bash
+cd sidecar
+GEMINI_API_KEY=... cargo test live_model -- --ignored --nocapture
+# HWV_MODEL=<model> to try another model; HWV_TEST_AUDIO=question.wav (16 kHz mono) to also
+# play a spoken question, e.g. one saved with record_calls.
+```
+
+Before a release, also make one real call from your phone and check its `metrics`: WhatsApp's
+protocol itself can only be tested with a real phone.
 
 Layout: the repo root is the Hermes plugin (`plugin.yaml`, `__init__.py`, `tools.py`, `cli.py`,
 `sidecar_client.py`), and `sidecar/` is the Rust sidecar. Tagging `vX.Y.Z` builds attested release
