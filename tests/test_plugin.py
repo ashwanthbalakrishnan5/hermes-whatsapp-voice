@@ -105,6 +105,11 @@ def test_sidecar_env(plugin):
     assert env["HWV_RING_TIMEOUT"] == "45s"
     assert env["HWV_LIVE_CONFIG"] == "{}"
     assert env["HWV_LANGUAGES"] == ""
+    assert env["HWV_VOICE_PROVIDER"] == "grok"
+    assert env["HWV_GROK_MODEL"] == "grok-voice-latest"
+    assert env["HWV_GROK_VOICE"] == "ara"
+    assert env["HWV_OPENAI_MODEL"] == "gpt-realtime-2.1"
+    assert env["HWV_OPENAI_VOICE"] == "cedar"
     assert env["HWV_SILENCE_TIMEOUT"] == "180s"
     assert env["GEMINI_API_KEY"] == "gemini-test"
     assert env["HERMES_API_KEY"] == "hermes-test"
@@ -191,3 +196,25 @@ def test_dashboard_settings_reject_unknown_keys_and_wrong_types(plugin, monkeypa
         [prefix + "answer_inbound", "false"],
         [prefix + "live_config", '{"a": {}}'],
     ]
+
+
+def test_dashboard_restart_uses_the_configured_command(plugin, monkeypatch):
+    import importlib.util
+    import subprocess
+
+    calls = []
+
+    def fake_run(argv, **kwargs):
+        calls.append(argv)
+        return subprocess.CompletedProcess(argv, 0, "", "")
+
+    spec = importlib.util.spec_from_file_location(
+        "hwv_dashboard_api", plugin.cli.PLUGIN_DIR / "dashboard" / "plugin_api.py"
+    )
+    api = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(api)
+    monkeypatch.setattr(api.subprocess, "run", fake_run)
+    monkeypatch.setenv("HWV_RESTART_COMMAND", "s6-svc -r /run/service/whatsapp-voice")
+
+    assert api.restart() == {"restarted": True}
+    assert calls == [["s6-svc", "-r", "/run/service/whatsapp-voice"]]

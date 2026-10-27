@@ -36,13 +36,38 @@ config_schema:
   voice_model:
     type: str
     default: "gemini-3.8-live"
-    label: "Voice model"
-    description: "Gemini Live model ID."
+    label: "Gemini model"
+    description: "Gemini Live model ID. Used when voice_provider is gemini, and as the fallback for grok and openai."
   voice:
     type: str
     default: "Kore"
-    label: "Voice"
-    description: "Gemini prebuilt voice, e.g. Kore, Puck, Charon."
+    label: "Gemini voice"
+    description: "Gemini prebuilt voice, e.g. Kore, Puck, Charon. Ignored by grok and openai, except on a Gemini fallback."
+  voice_provider:
+    type: str
+    default: "grok"
+    label: "Voice provider"
+    description: "grok uses the SuperGrok login, openai the ChatGPT login (hermes auth login openai-codex). gemini is the fallback and the previous path. No API key for grok or openai."
+  grok_model:
+    type: str
+    default: "grok-voice-latest"
+    label: "Grok voice model"
+    description: "Grok realtime model. The socket URL carries this. Not a metered API key."
+  grok_voice:
+    type: str
+    default: "ara"
+    label: "Grok voice"
+    description: "Grok voice name, e.g. ara, eve, rex. Not a Gemini voice."
+  openai_model:
+    type: str
+    default: "gpt-realtime-2.1"
+    label: "OpenAI voice model"
+    description: "OpenAI Realtime model, on the ChatGPT subscription. Not a metered API key."
+  openai_voice:
+    type: str
+    default: "cedar"
+    label: "OpenAI voice"
+    description: "OpenAI Realtime voice: alloy, ash, ballad, coral, echo, sage, shimmer, verse, marin or cedar."
   assistant_name:
     type: str
     default: "Hermes"

@@ -9,7 +9,9 @@ mod audio;
 mod calls;
 mod config;
 mod gemini;
+mod grok;
 mod hermes;
+mod openai;
 mod server;
 
 use std::sync::Arc;
@@ -41,12 +43,14 @@ async fn main() -> Result<()> {
             };
             pair(phone).await
         }
+        Some("grok-check") => grok::probe().await,
+        Some("openai-check") => openai::probe().await,
         Some("serve") => serve().await,
         Some("--version") => {
             println!("{}", env!("CARGO_PKG_VERSION"));
             Ok(())
         }
-        _ => bail!("usage: hermes-wa-voice pair [--phone <number>] | serve"),
+        _ => bail!("usage: hermes-wa-voice pair [--phone <number>] | serve | grok-check | openai-check"),
     }
 }
 
@@ -189,6 +193,10 @@ async fn serve() -> Result<()> {
     if bridge.cfg.hermes_api_key.is_empty() {
         log::warn!("API_SERVER_KEY not set: calls work, but the voice agent cannot reach Hermes");
     }
+    log::info!(
+        "ple-1166-grok-voice provider={}",
+        bridge.cfg.voice_provider
+    );
     tokio::spawn({
         let bridge = bridge.clone();
         async move { bridge.refresh_persona().await }
@@ -202,4 +210,14 @@ async fn serve() -> Result<()> {
     // Saves the device session and encryption state; exiting without it can lose them.
     bot.shutdown().await;
     res
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = tokio::signal::ctrl_c();
+    let mut term = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+        .expect("sigterm handler");
+    tokio::select! {
+        _ = ctrl_c => {}
+        _ = term.recv() => {}
+    }
 }

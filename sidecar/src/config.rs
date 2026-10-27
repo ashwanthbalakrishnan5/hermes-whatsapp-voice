@@ -35,6 +35,15 @@ pub struct Config {
     pub silence_timeout: Duration,
     pub answer_inbound: bool,
     pub send_summary: bool,
+    /// "grok", "openai" or "gemini". Grok uses the xai-oauth login and OpenAI the
+    /// openai-codex (ChatGPT) login, never an API key.
+    pub voice_provider: String,
+    pub grok_model: String,
+    pub grok_voice: String,
+    pub openai_model: String,
+    pub openai_voice: String,
+    /// Host home that holds auth.json. Read-only.
+    pub hermes_home: PathBuf,
 }
 
 fn var(name: &str, default: &str) -> String {
@@ -70,6 +79,14 @@ pub fn parse_duration(s: &str) -> Result<Duration> {
         _ => bail!("bad duration unit in {s:?}"),
     };
     Ok(Duration::from_secs(secs))
+}
+
+fn voice_provider() -> Result<String> {
+    let value = var("HWV_VOICE_PROVIDER", "gemini").to_ascii_lowercase();
+    if !matches!(value.as_str(), "grok" | "openai" | "gemini") {
+        bail!("HWV_VOICE_PROVIDER must be grok, openai or gemini");
+    }
+    Ok(value)
 }
 
 fn live_config(raw: &str) -> Result<serde_json::Value> {
@@ -129,6 +146,12 @@ impl Config {
             silence_timeout: parse_duration(&var("HWV_SILENCE_TIMEOUT", "180s"))?,
             answer_inbound: var("HWV_ANSWER_INBOUND", "true") == "true",
             send_summary: var("HWV_SEND_SUMMARY", "true") == "true",
+            voice_provider: voice_provider()?,
+            grok_model: var("HWV_GROK_MODEL", "grok-voice-latest"),
+            grok_voice: var("HWV_GROK_VOICE", "ara"),
+            openai_model: var("HWV_OPENAI_MODEL", "gpt-realtime-2.1"),
+            openai_voice: var("HWV_OPENAI_VOICE", "cedar"),
+            hermes_home: PathBuf::from(var("HERMES_HOME", "/opt/data")),
         })
     }
 
