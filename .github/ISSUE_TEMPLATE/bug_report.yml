@@ -1,0 +1,52 @@
+name: Bug report
+description: Something doesn't work
+labels: ["bug", "needs triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please remove phone numbers, names and API keys from anything you paste below.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: dropdown
+    id: direction
+    attributes:
+      label: Call direction
+      options:
+        - Owner calls the bot (inbound)
+        - Bot calls the owner (outbound)
+        - Both
+        - Not about a call (install, pairing, dashboard, ...)
+    validations:
+      required: true
+  - type: input
+    id: client
+    attributes:
+      label: Owner's WhatsApp client
+      placeholder: iPhone / Android / WhatsApp Desktop on Windows / ...
+  - type: input
+    id: version
+    attributes:
+      label: Plugin version
+      description: "`version` in plugin.yaml"
+      placeholder: 0.1.12
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      placeholder: Linux VPS / macOS, Hermes version, voice model
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sidecar logs
+      description: |
+        Linux: `journalctl --user -u hermes-whatsapp-voice`. macOS: `sidecar.log` in the plugin's data
+        directory. Run the sidecar with `RUST_LOG=debug` for call media problems.
+      render: text

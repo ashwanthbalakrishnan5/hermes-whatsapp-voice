@@ -1,0 +1,7 @@
+# Actions only: the sidecar pins whatsapp-rust to a git rev that is upgraded by hand.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
