@@ -178,6 +178,7 @@ def test_dashboard_settings_reject_unknown_keys_and_wrong_types(plugin, monkeypa
         {"answer_inbound": "yes"},
         {"ring_timeout_seconds": True},
         {"max_call_minutes": 0},
+        {"context_mode": "shared"},
     ):
         with pytest.raises(HTTPException):
             api.save_settings(bad)

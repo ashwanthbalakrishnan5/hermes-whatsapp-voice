@@ -104,6 +104,8 @@ def save_settings(body: dict):
             raise HTTPException(400, f"{key} must be {spec.get('type', 'str')}")
         if expected is int and value < 1:
             raise HTTPException(400, f"{spec.get('label', key)} must be 1 or more")
+        if "choices" in spec and value not in spec["choices"]:
+            raise HTTPException(400, f"{spec.get('label', key)} must be one of {', '.join(spec['choices'])}")
     for key, value in body.items():
         # The public `hermes config set` CLI (same interpreter, so PATH doesn't matter): it replaces
         # the value, parses JSON objects, ints and booleans, and keeps other text as a string.

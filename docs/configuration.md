@@ -13,7 +13,7 @@ Restart the sidecar after a change: the dashboard's **Restart sidecar** button, 
 
 | key | default | |
 |---|---|---|
-| `context_mode` | `core_session` | `core_session`: the voice is the model of your WhatsApp chat with Hermes (see below). `separate`: a separate voice agent that asks Hermes through `ask_hermes` |
+| `context_mode` | `separate` | `separate`: a small voice agent with a short briefing that asks Hermes through `ask_hermes`. `core_session`: the voice is the model of your WhatsApp chat with Hermes (see below); costs several times more per call |
 | `owner_number` | (required) | Your number, international format |
 | `voice_model` | `gemini-3.8-live` | Gemini Live model |
 | `voice` | `Kore` | Gemini prebuilt voice |
@@ -77,7 +77,7 @@ hermes config set plugins.entries.hermes-whatsapp-voice.settings.voice_instructi
 
 ## Core-session mode
 
-With `context_mode: core_session` (the default), `hermes whatsapp-voice serve` also runs a small
+With `context_mode: core_session`, `hermes whatsapp-voice serve` also runs a small
 loopback service in Hermes's own interpreter, and each call becomes part of your WhatsApp DM
 session with Hermes:
 
@@ -93,6 +93,10 @@ session with Hermes:
 - **Texts during a call** go into the call: the voice answers them, and the text agent stays quiet
   (a gateway hook; slash commands, media and other chats are unaffected). Needs a gateway restart
   after installing or updating the plugin.
+
+**Cost:** a live voice model re-reads its whole context on every reply. In this mode that context is
+the chat's system prompt, tool schemas and up to `history_chars` of history, so a call costs several
+times more than with `separate`. Each call record shows the tokens the voice model used (`usage`).
 
 It uses Hermes internals that are not part of the plugin API (listed in `CORE_PATCHES.md`); if the
 service is unavailable, a call falls back to the separate voice agent. It needs a WhatsApp DM

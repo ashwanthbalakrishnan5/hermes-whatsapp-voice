@@ -229,7 +229,9 @@
       );
     }
     let input;
-    if (type === "dict") {
+    if (spec.choices) {
+      input = h("select", { className: "hwv-select", value, onChange: (e) => onChange(e.target.value) }, ...spec.choices.map((c) => h("option", { key: c, value: c }, c)));
+    } else if (type === "dict") {
       input = h("textarea", { className: "hwv-textarea is-code", spellCheck: false, value, onChange: (e) => onChange(e.target.value) });
     } else if (name === "voice_instructions") {
       input = h("textarea", { className: "hwv-textarea", value: value || "", onChange: (e) => onChange(e.target.value) });

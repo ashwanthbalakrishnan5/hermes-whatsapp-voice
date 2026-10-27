@@ -130,7 +130,7 @@ def test_owner_texts_go_into_an_active_call_instead_of_the_text_agent(plugin, mo
     sidecar = FakeSidecar([])
     try:
         (plugin.sidecar_client.data_dir() / "sidecar.token").write_text(sidecar.token)
-        ctx = FakeCtx(owner_number="+1 555 000 1111", listen=sidecar.listen)
+        ctx = FakeCtx(owner_number="+1 555 000 1111", listen=sidecar.listen, context_mode="core_session")
         plugin.register(ctx)
         hook = ctx.hooks["pre_gateway_dispatch"]
         run = lambda event: asyncio.run(hook(event=event))

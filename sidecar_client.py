@@ -22,7 +22,7 @@ PLUGIN_DIR = Path(__file__).resolve().parent
 
 # Settings forwarded to the sidecar, with the defaults from plugin.yaml.
 SETTINGS: dict[str, Any] = {
-    "context_mode": "core_session",
+    "context_mode": "separate",
     "owner_number": "",
     "voice_model": "gemini-3.8-live",
     "voice": "Kore",

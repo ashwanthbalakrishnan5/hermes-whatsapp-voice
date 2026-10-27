@@ -29,9 +29,10 @@ optional_env:
 config_schema:
   context_mode:
     type: str
-    default: "core_session"
+    default: "separate"
+    choices: ["separate", "core_session"]
     label: "Call context"
-    description: "core_session: the voice is the model of your WhatsApp chat with Hermes (same prompt, history and tools; the call is saved into that chat). separate: a separate voice agent that asks Hermes for help."
+    description: "separate: a small voice agent with a short briefing that asks Hermes for help (cheapest). core_session: the voice is the model of your WhatsApp chat with Hermes (same prompt, history and tools; the call is saved into that chat); every reply re-reads that context, so calls cost several times more."
   owner_number:
     type: str
     default: ""
