@@ -796,7 +796,8 @@ impl Bridge {
         args: &Value,
         done: mpsc::UnboundedSender<ToolDone>,
     ) -> JoinHandle<()> {
-        let (hermes, timeout) = (self.hermes.clone(), self.cfg.hermes_timeout);
+        let hermes = self.hermes.clone();
+        let hermes_timeout = self.cfg.hermes_timeout;
         let request = args["request"].as_str().unwrap_or_default().to_string();
         let (tool_id, session) = (id.to_string(), format!("whatsapp-voice-{call_id}"));
         tokio::spawn(async move {
@@ -806,7 +807,10 @@ impl Bridge {
                     let instructions = "This request comes from the owner, live on a WhatsApp voice call \
                         with your voice agent. Do what is asked. Reply in one to three short, plain \
                         sentences that can be read aloud: no markdown, lists, links or emoji.";
-                    match h.run(&request, instructions, &session, timeout).await {
+                    match h
+                        .run(&request, instructions, &session, hermes_timeout)
+                        .await
+                    {
                         Ok(answer) => json!({"result": answer}),
                         Err(e) => json!({"error": format!("{e:#}")}),
                     }
