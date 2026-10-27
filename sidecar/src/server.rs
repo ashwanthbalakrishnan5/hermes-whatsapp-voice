@@ -38,7 +38,7 @@ async fn health(State(bridge): State<Arc<Bridge>>, headers: HeaderMap) -> ApiRes
     Ok(Json(json!({
         "ok": true,
         "version": env!("CARGO_PKG_VERSION"),
-        "logged_in": bridge.client.is_logged_in(),
+        "logged_in": bridge.client.as_ref().is_some_and(|c| c.is_logged_in()),
         "active_call": bridge.calls.active(),
         "hermes_connected": !bridge.cfg.hermes_api_key.is_empty(),
     }))
@@ -62,7 +62,7 @@ async fn start_call(
     if reason.is_empty() {
         return Err(error(StatusCode::BAD_REQUEST, "reason is required"));
     }
-    if !bridge.client.is_logged_in() {
+    if !bridge.client.as_ref().is_some_and(|c| c.is_logged_in()) {
         return Err(error(
             StatusCode::SERVICE_UNAVAILABLE,
             "not connected to WhatsApp",

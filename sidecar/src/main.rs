@@ -183,7 +183,7 @@ async fn serve() -> Result<()> {
         .await
         .map_err(|e| anyhow!("starting WhatsApp client: {e}"))?
         .spawn();
-    let bridge = Arc::new(Bridge::new(cfg, bot.client()));
+    let bridge = Arc::new(Bridge::new(cfg, Some(bot.client())));
     let _subscription = bot.client().subscribe_handler(Arc::new(CallObserver {
         bridge: bridge.clone(),
     }));

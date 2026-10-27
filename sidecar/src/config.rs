@@ -13,6 +13,8 @@ pub struct Config {
     pub listen: String,
     pub token: String,
     pub gemini_api_key: String,
+    /// Live API WebSocket endpoint (a proxy, or a local fake in tests).
+    pub gemini_url: String,
     pub model: String,
     pub voice: String,
     pub assistant_name: String,
@@ -29,6 +31,14 @@ pub struct Config {
     pub max_duration: Duration,
     /// End a call after this long with nobody speaking.
     pub silence_timeout: Duration,
+    /// How long ask_hermes and the post-call summary may wait for Hermes.
+    pub hermes_timeout: Duration,
+    /// Quiet time after the assistant's goodbye before it hangs up.
+    pub hangup_grace: Duration,
+    /// Tool calls the model may make in a row before it must speak to the owner.
+    pub max_silent_tools: u32,
+    /// Where each call's owner audio is saved as a WAV file; None turns recording off.
+    pub recordings: Option<PathBuf>,
     pub answer_inbound: bool,
     pub send_summary: bool,
     /// Where the plugin's core-session service listens; empty means the separate-agent mode
@@ -117,6 +127,7 @@ impl Config {
             listen,
             token: required("HWV_TOKEN")?,
             gemini_api_key: required("GEMINI_API_KEY")?,
+            gemini_url: var("HWV_GEMINI_URL", crate::gemini::ENDPOINT),
             model: var("HWV_MODEL", "gemini-3.8-live"),
             voice: var("HWV_VOICE", "Kore"),
             assistant_name: var("HWV_ASSISTANT_NAME", "Hermes"),
@@ -130,6 +141,14 @@ impl Config {
             ring_timeout: parse_duration(&var("HWV_RING_TIMEOUT", "45s"))?,
             max_duration: parse_duration(&var("HWV_MAX_DURATION", "15m"))?,
             silence_timeout: parse_duration(&var("HWV_SILENCE_TIMEOUT", "180s"))?,
+            hermes_timeout: parse_duration(&var("HWV_HERMES_TIMEOUT", "180s"))?,
+            hangup_grace: parse_duration(&var("HWV_HANGUP_GRACE", "3s"))?,
+            max_silent_tools: var("HWV_MAX_SILENT_TOOLS", "5")
+                .parse()
+                .context("HWV_MAX_SILENT_TOOLS must be a whole number")?,
+            recordings: (var("HWV_RECORD_CALLS", "false") == "true")
+                .then(|| Self::data_dir().map(|d| d.join("recordings")))
+                .transpose()?,
             answer_inbound: var("HWV_ANSWER_INBOUND", "true") == "true",
             send_summary: var("HWV_SEND_SUMMARY", "true") == "true",
             context_url: var("HWV_CONTEXT_URL", "").trim_end_matches('/').to_string(),

@@ -4,6 +4,9 @@
 //! 320-sample (20 ms) frames. Gemini Live takes 16 kHz s16le and returns 24 kHz s16le.
 
 use std::collections::VecDeque;
+use std::fs::File;
+use std::io::{self, BufWriter, Seek, SeekFrom, Write};
+use std::path::Path;
 use std::sync::Mutex;
 
 pub const FRAME_SAMPLES: usize = 960;
@@ -118,6 +121,53 @@ impl Playout {
     }
 }
 
+/// Writes mono 16-bit PCM to a WAV file as it arrives; `finish` fills in the sizes.
+pub struct WavWriter {
+    file: BufWriter<File>,
+    bytes: u32,
+}
+
+impl WavWriter {
+    pub fn create(path: &Path, rate: u32) -> io::Result<Self> {
+        let mut file = BufWriter::new(File::create(path)?);
+        file.write_all(b"RIFF\0\0\0\0WAVEfmt ")?;
+        for (v, n) in [
+            (16, 4),
+            (1, 2),
+            (1, 2),
+            (rate, 4),
+            (rate * 2, 4),
+            (2, 2),
+            (16, 2),
+        ] {
+            file.write_all(&u32::to_le_bytes(v)[..n])?;
+        }
+        file.write_all(b"data\0\0\0\0")?;
+        Ok(Self { file, bytes: 0 })
+    }
+
+    pub fn write(&mut self, pcm: &[i16]) -> io::Result<()> {
+        self.bytes += (pcm.len() * 2) as u32;
+        self.file.write_all(&i16_to_le_bytes(pcm))
+    }
+
+    pub fn finish(mut self) -> io::Result<()> {
+        self.file.seek(SeekFrom::Start(4))?;
+        self.file.write_all(&(36 + self.bytes).to_le_bytes())?;
+        self.file.seek(SeekFrom::Start(40))?;
+        self.file.write_all(&self.bytes.to_le_bytes())?;
+        self.file.flush()
+    }
+}
+
+/// Reads a mono 16-bit PCM WAV written by `WavWriter` (or any plain 44-byte-header WAV).
+#[cfg(test)]
+pub fn read_wav(path: &Path) -> io::Result<(u32, Vec<i16>)> {
+    let bytes = std::fs::read(path)?;
+    let rate = u32::from_le_bytes(bytes[24..28].try_into().unwrap());
+    Ok((rate, le_bytes_to_i16(&bytes[44..])))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -130,6 +180,18 @@ mod tests {
 
     fn rms(s: &[i16]) -> f64 {
         (s.iter().map(|&v| (v as f64).powi(2)).sum::<f64>() / s.len() as f64).sqrt()
+    }
+
+    #[test]
+    fn wav_round_trip() {
+        let path = std::env::temp_dir().join(format!("hwv-{}.wav", std::process::id()));
+        let mut w = WavWriter::create(&path, 16_000).unwrap();
+        w.write(&[1, -2, 3]).unwrap();
+        w.write(&[4]).unwrap();
+        w.finish().unwrap();
+        assert_eq!(read_wav(&path).unwrap(), (16_000, vec![1, -2, 3, 4]));
+        assert_eq!(std::fs::metadata(&path).unwrap().len(), 44 + 8);
+        std::fs::remove_file(path).unwrap();
     }
 
     #[test]

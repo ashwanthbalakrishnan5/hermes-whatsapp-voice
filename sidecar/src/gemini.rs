@@ -22,7 +22,7 @@ use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 
 use crate::audio::{i16_to_le_bytes, le_bytes_to_i16};
 
-const ENDPOINT: &str = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent";
+pub const ENDPOINT: &str = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent";
 const MAX_RECONNECTS: u32 = 3;
 
 type Ws = WebSocketStream<MaybeTlsStream<TcpStream>>;
@@ -126,6 +126,11 @@ pub enum LiveEvent {
     ToolCancelled(Vec<String>),
     /// The model finished its turn.
     TurnComplete,
+    /// Tokens billed for one model response.
+    Usage {
+        prompt: u64,
+        response: u64,
+    },
     /// The session ended for good; carries the reason.
     Closed(String),
 }
@@ -204,6 +209,12 @@ fn parse_server_message(msg: &Value) -> Parsed {
         p.resume_handle = Some(h.to_string());
     }
     p.go_away = msg.get("goAway").map(|g| parse_time_left(&g["timeLeft"]));
+    if let Some(u) = msg.get("usageMetadata") {
+        p.events.push(LiveEvent::Usage {
+            prompt: u["promptTokenCount"].as_u64().unwrap_or(0),
+            response: u["responseTokenCount"].as_u64().unwrap_or(0),
+        });
+    }
     p
 }
 
@@ -220,8 +231,8 @@ pub struct Live {
 }
 
 impl Live {
-    pub async fn connect(api_key: &str, setup: Setup) -> Result<Self> {
-        let mut ws = open(api_key, &setup.message(None)).await?;
+    pub async fn connect(url: &str, api_key: &str, setup: Setup) -> Result<Self> {
+        let mut ws = open(url, api_key, &setup.message(None)).await?;
         if !setup.history.is_empty() {
             // With initialHistoryInClientContent the server takes this as context, not a prompt.
             let history = json!({"clientContent": {"turns": setup.history, "turnComplete": true}});
@@ -231,7 +242,14 @@ impl Live {
         }
         let (outbox, out_rx) = mpsc::unbounded_channel();
         let (ev_tx, events) = mpsc::unbounded_channel();
-        let task = tokio::spawn(run(api_key.to_string(), setup, ws, out_rx, ev_tx));
+        let task = tokio::spawn(run(
+            url.to_string(),
+            api_key.to_string(),
+            setup,
+            ws,
+            out_rx,
+            ev_tx,
+        ));
         Ok(Self {
             outbox,
             events,
@@ -278,8 +296,8 @@ impl Drop for Live {
     }
 }
 
-async fn open(api_key: &str, setup: &Value) -> Result<Ws> {
-    let mut req = ENDPOINT.into_client_request()?;
+async fn open(url: &str, api_key: &str, setup: &Value) -> Result<Ws> {
+    let mut req = url.into_client_request()?;
     req.headers_mut().insert("x-goog-api-key", api_key.parse()?);
     let (mut ws, _) = tokio::time::timeout(
         Duration::from_secs(15),
@@ -396,6 +414,7 @@ async fn pump(
 }
 
 async fn run(
+    url: String,
     api_key: String,
     setup: Setup,
     mut ws: Ws,
@@ -423,8 +442,11 @@ async fn run(
             return;
         };
         log::info!("gemini: {why}; resuming session");
+        // After goAway the old socket is still open, and the server refuses to resume a session
+        // that is still connected ("already connected to an existing client").
+        let _ = tokio::time::timeout(Duration::from_secs(2), ws.close(None)).await;
         loop {
-            match open(&api_key, &setup.message(Some(&handle))).await {
+            match open(&url, &api_key, &setup.message(Some(&handle))).await {
                 Ok(next) => {
                     ws = next;
                     failures = 0;
@@ -499,6 +521,18 @@ mod tests {
         assert_eq!(p.resume_handle.as_deref(), Some("h2"));
         assert!(p.turn_complete);
         assert_eq!(p.go_away, Some(Duration::from_secs(5)));
+    }
+
+    #[test]
+    fn reports_token_usage() {
+        let msg = json!({"usageMetadata": {"promptTokenCount": 1200, "responseTokenCount": 80, "totalTokenCount": 1280}});
+        assert_eq!(
+            parse_server_message(&msg).events,
+            vec![LiveEvent::Usage {
+                prompt: 1200,
+                response: 80
+            }]
+        );
     }
 
     #[test]
@@ -647,7 +681,7 @@ mod tests {
             ],
             vocabulary: vec!["Zephyrine".into()],
         };
-        let mut live = Live::connect(&key, setup).await.expect("connect");
+        let mut live = Live::connect(ENDPOINT, &key, setup).await.expect("connect");
         live.send_text("What is my favourite colour?");
         let (mut audio, mut transcript) = (0usize, String::new());
         let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
