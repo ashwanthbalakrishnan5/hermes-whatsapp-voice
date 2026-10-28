@@ -1,44 +1,104 @@
-# hermes-whatsapp-voice
+<p align="center">
+  <img src="docs/assets/banner.svg" alt="hermes-whatsapp-voice: call your Hermes agent on WhatsApp, or let it call you" width="100%">
+</p>
 
-Live voice calls with [Hermes](https://github.com/NousResearch/hermes-agent) over WhatsApp.
+<p align="center">
+  <a href="https://github.com/ashwanthbalakrishnan5/hermes-whatsapp-voice/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/ashwanthbalakrishnan5/hermes-whatsapp-voice?color=25d366&label=release"></a>
+  <a href="https://github.com/ashwanthbalakrishnan5/hermes-whatsapp-voice/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/ashwanthbalakrishnan5/hermes-whatsapp-voice/ci.yml?branch=main&label=CI"></a>
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/github/license/ashwanthbalakrishnan5/hermes-whatsapp-voice?color=blue"></a>
+  <a href="https://github.com/ashwanthbalakrishnan5/hermes-whatsapp-voice/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/ashwanthbalakrishnan5/hermes-whatsapp-voice?style=flat&color=f5c518"></a>
+  <a href="https://github.com/NousResearch/hermes-agent"><img alt="Hermes plugin" src="https://img.shields.io/badge/Hermes-plugin-7c3aed"></a>
+  <img alt="Linux and macOS" src="https://img.shields.io/badge/platforms-Linux%20%7C%20macOS-555">
+</p>
 
-- **Call your bot.** Call your Hermes bot's WhatsApp number and talk to it. The voice agent can hand
-  real work to Hermes mid-call ("move my 3pm to tomorrow", "what did Sam say about the invoice?").
-- **Let Hermes call you.** For things that matter, Hermes can ring you instead of sending a message:
-  a top-priority reminder, an urgent alert, a cron job that needs a decision. If you don't pick up,
-  the tool says so and Hermes falls back to another channel.
-- **Summary afterwards.** When a call ends, Hermes digests the transcript and sends you a short
-  summary in WhatsApp.
+<p align="center">
+  <a href="#quick-start"><b>Quick start</b></a> ·
+  <a href="#how-it-works"><b>How it works</b></a> ·
+  <a href="docs/configuration.md"><b>Configuration</b></a> ·
+  <a href="CONTRIBUTING.md"><b>Contributing</b></a> ·
+  <a href="SECURITY.md"><b>Security</b></a>
+</p>
 
-It works with the personal-number setup most Hermes users already have (WhatsApp linked as a
-device). No WhatsApp Business / Cloud API account is needed.
+Live voice calls with [Hermes](https://github.com/NousResearch/hermes-agent) over WhatsApp. Call your
+bot's number and talk to your agent, or let Hermes ring you when something can't wait. It works with
+the personal-number setup most Hermes users already have (WhatsApp linked as a device): no WhatsApp
+Business or Cloud API account needed.
 
-## How it works
+## Features
 
-```
- your phone ──WhatsApp call──▶ bot number ──▶ hermes-wa-voice (linked device, Rust)
-                                                 │  call audio (16 kHz in, 24 kHz out, resampled)
-                                                 ▼
-                                            Gemini Live (speech-to-speech)
-                                                 │  ask_hermes(...) tool calls
-                                                 ▼
-                                            Hermes API server (/v1/runs)
-```
+<table>
+<tr>
+<td width="50%" valign="top">
 
-- **`hermes-wa-voice`** is a small sidecar built on
-  [whatsapp-rust](https://github.com/oxidezap/whatsapp-rust). It links to the bot's WhatsApp number
-  as one more linked device (WhatsApp allows four), answers calls from your number only, and places
-  calls to your number only.
-- Call audio is bridged to **Gemini Live** (`gemini-3.8-live` by default) for natural, interruptible
-  speech-to-speech.
-- The voice model gets two tools:
-  - `ask_hermes`, which runs a Hermes turn through the API server and speaks the result when it
-    arrives;
-  - `end_call`, which hangs up after a goodbye.
-- The **Hermes plugin** adds two agent tools: `whatsapp_call_owner(reason, details?)` and
-  `whatsapp_call_status(call_id?)`. It also adds a `hermes whatsapp-voice` command for setup.
+**📞 Call your bot**<br>
+Talk to Hermes like a person. The voice hands real work to Hermes mid-call: "move my 3pm to
+tomorrow", "what did Sam say about the invoice?"
 
-## Requirements
+</td>
+<td width="50%" valign="top">
+
+**🔔 Hermes calls you**<br>
+For things that matter, Hermes rings instead of texting: an urgent reminder, an alert, a cron job
+that needs a decision. No answer? It falls back to another channel.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+**⚡ Natural and fast**<br>
+Speech-to-speech with Gemini Live: ready about 0.2 s after you pick up, sub-second replies, and you
+can talk over it.
+
+</td>
+<td valign="top">
+
+**🧠 Your assistant, not a stranger**<br>
+The voice takes its name, personality and memory from your Hermes. Optional chat-session mode makes
+the call part of your WhatsApp chat with it.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+**🔒 Owner-only by design**<br>
+It answers only your number and calls only your number. No tool takes a destination, so a prompt
+injection can't make it call anyone else.
+
+</td>
+<td valign="top">
+
+**🧩 Nothing to build**<br>
+Prebuilt, attested sidecar binaries download on first run. Pair, configure and watch calls from a
+tab in the Hermes dashboard.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+**🌍 Speaks your language**<br>
+Pin the languages you speak, and your main one for speech recognition. Tamil, Hindi, Portuguese,
+Japanese and two dozen more.
+
+</td>
+<td valign="top">
+
+**🧪 Whole calls under test**<br>
+Every PR runs simulated calls (dropped sockets, slow tools, hangups) in CI, and real-model tests run
+before each release.
+
+</td>
+</tr>
+</table>
+
+After each call you get a short summary on WhatsApp, and every call keeps a record with its
+transcript and timing (`hermes whatsapp-voice calls`).
+
+## Quick start
+
+### Requirements
 
 - Hermes `>= 0.21.5` on Linux or macOS.
 - A separate WhatsApp number for the bot: Hermes's WhatsApp `bot` mode, or any spare number. In
@@ -46,18 +106,25 @@ device). No WhatsApp Business / Cloud API account is needed.
 - Gemini set up in Hermes with an API key. The plugin reuses the key of Hermes's Gemini provider
   (`GOOGLE_API_KEY`, else `GEMINI_API_KEY`), so there is nothing extra to enter. Without one,
   `hermes model` (choose Gemini) adds it. Google login (Cloud Code OAuth) does not work for the
-  Live API. The live models have a free tier, but Google may use free-tier data. Paid use is
-  roughly $0.005/min of audio in and $0.018/min out.
+  Live API. The live models have a free tier, but Google may use free-tier data. On the paid tier a
+  call costs roughly 3 to 5 cents a minute with the default settings (estimated from real calls; each
+  call's token use is in its `metrics`).
 - Optional, but needed for the voice agent to reach Hermes: the Hermes
   [API server](https://hermes-agent.nousresearch.com/docs/user-guide/features/api-server) enabled.
   It must have an `API_SERVER_KEY`.
 
-## Install
+### Install
 
-**Let your agent do it.** Tell Hermes (or any coding agent on that machine) to follow
-[skills/setup/SKILL.md](skills/setup/SKILL.md). It's a step-by-step runbook written for agents,
-and it stops to ask you only for your number and to scan a QR code. After installing, Hermes can
-also load it as `hermes-whatsapp-voice:setup`.
+**Let your agent do it.** Paste this into Hermes (or any coding agent on that machine):
+
+```text
+Set up live WhatsApp voice calls for my Hermes by following this runbook step by step:
+https://raw.githubusercontent.com/ashwanthbalakrishnan5/hermes-whatsapp-voice/main/skills/setup/SKILL.md
+```
+
+The [runbook](skills/setup/SKILL.md) is written for agents, and it stops to ask you only for your
+number and to scan a QR code. After installing, Hermes can also load it as
+`hermes-whatsapp-voice:setup`.
 
 **Or by hand:**
 
@@ -65,7 +132,7 @@ also load it as `hermes-whatsapp-voice:setup`.
 hermes plugins install ashwanthbalakrishnan5/hermes-whatsapp-voice --enable
 ```
 
-### 1. Set your number
+#### 1. Set your number
 
 This is the only number that will ever be called, and the only caller that will be answered.
 
@@ -73,7 +140,7 @@ This is the only number that will ever be called, and the only caller that will 
 hermes config set plugins.entries.hermes-whatsapp-voice.settings.owner_number +15551234567
 ```
 
-### 2. Link the sidecar to the bot's WhatsApp number (once)
+#### 2. Link the sidecar to the bot's WhatsApp number (once)
 
 Easiest: open the Hermes dashboard, go to the **WhatsApp Voice** tab, click **Pair with
 WhatsApp**, and scan the QR from the **bot's** phone (WhatsApp > Linked devices > Link a device).
@@ -97,7 +164,7 @@ amd64/arm64 and macOS arm64. To build it yourself instead (Rust 1.94+, cmake, a 
 > can approve a new device, so the link happens once. It uses one of WhatsApp's four linked-device
 > slots.
 
-### 3. Enable the Hermes API server (recommended)
+#### 3. Enable the Hermes API server (recommended)
 
 ```bash
 # in Hermes's .env (~/.hermes/.env by default)
@@ -107,7 +174,7 @@ API_SERVER_KEY=<a long random string>
 
 Restart the gateway after this.
 
-### 4. Run the sidecar
+#### 4. Run the sidecar
 
 ```bash
 hermes whatsapp-voice serve      # foreground, to try it out
@@ -137,6 +204,31 @@ hermes cron create "0 9 * * 1-5" \
 
 The tool waits until the call is answered, declined or unanswered, and returns that status. On
 `no_answer`/`rejected`/`failed` it tells the agent to use another channel.
+
+## How it works
+
+```
+ your phone ──WhatsApp call──▶ bot number ──▶ hermes-wa-voice (linked device, Rust)
+                                                 │  call audio (16 kHz in, 24 kHz out, resampled)
+                                                 ▼
+                                            Gemini Live (speech-to-speech)
+                                                 │  ask_hermes(...) tool calls
+                                                 ▼
+                                            Hermes API server (/v1/runs)
+```
+
+- **`hermes-wa-voice`** is a small sidecar built on
+  [whatsapp-rust](https://github.com/oxidezap/whatsapp-rust). It links to the bot's WhatsApp number
+  as one more linked device (WhatsApp allows four), answers calls from your number only, and places
+  calls to your number only.
+- Call audio is bridged to **Gemini Live** (`gemini-3.8-live` by default) for natural, interruptible
+  speech-to-speech.
+- The voice model gets two tools:
+  - `ask_hermes`, which runs a Hermes turn through the API server and speaks the result when it
+    arrives;
+  - `end_call`, which hangs up after a goodbye.
+- The **Hermes plugin** adds two agent tools: `whatsapp_call_owner(reason, details?)` and
+  `whatsapp_call_status(call_id?)`. It also adds a `hermes whatsapp-voice` command for setup.
 
 ## Configure
 
@@ -238,6 +330,26 @@ Layout: the repo root is the Hermes plugin (`plugin.yaml`, `__init__.py`, `tools
 binaries (`.github/workflows/release.yml`). Then commit the release's `SHA256SUMS` as
 `sidecar/release-checksums.txt`. Keep `version` in `plugin.yaml` and `sidecar/Cargo.toml` in step
 with the tag.
+
+## Contributing
+
+Bug reports, fixes and features are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Issues labelled
+[good first issue](https://github.com/ashwanthbalakrishnan5/hermes-whatsapp-voice/labels/good%20first%20issue) are a good place to start.
+Security issues go through [private reporting](SECURITY.md), not public issues.
+
+<a href="https://github.com/ashwanthbalakrishnan5/hermes-whatsapp-voice/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=ashwanthbalakrishnan5/hermes-whatsapp-voice" alt="Contributors">
+</a>
+
+## Star history
+
+<a href="https://star-history.com/#ashwanthbalakrishnan5/hermes-whatsapp-voice&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=ashwanthbalakrishnan5/hermes-whatsapp-voice&type=Date&theme=dark">
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=ashwanthbalakrishnan5/hermes-whatsapp-voice&type=Date">
+    <img alt="Star history chart" src="https://api.star-history.com/svg?repos=ashwanthbalakrishnan5/hermes-whatsapp-voice&type=Date">
+  </picture>
+</a>
 
 ## Credits
 

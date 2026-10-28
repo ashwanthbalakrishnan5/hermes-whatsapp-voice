@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="400" viewBox="0 0 1280 400" role="img" aria-labelledby="t d">
+  <title id="t">hermes-whatsapp-voice</title>
+  <desc id="d">Live WhatsApp voice calls with your Hermes agent: call it, or let it call you.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b141a"/>
+      <stop offset="1" stop-color="#132a24"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.15" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#25d366" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#25d366" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bar" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#128c7e"/>
+      <stop offset="1" stop-color="#25d366"/>
+    </linearGradient>
+    <linearGradient id="badge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#25d366"/>
+      <stop offset="1" stop-color="#128c7e"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1280" height="400" rx="24" fill="url(#bg)"/>
+  <rect width="1280" height="400" rx="24" fill="url(#glow)"/>
+
+  <!-- phone in a ringing circle -->
+  <g transform="translate(190 200)">
+    <circle r="132" fill="none" stroke="#25d366" stroke-opacity="0.12" stroke-width="2"/>
+    <circle r="108" fill="none" stroke="#25d366" stroke-opacity="0.22" stroke-width="2"/>
+    <circle r="84" fill="url(#badge)"/>
+    <path transform="translate(-36 -36) scale(3)" fill="#ffffff"
+      d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.02-.24 11.36 11.36 0 0 0 3.57.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1.02l-2.2 2.2z"/>
+  </g>
+
+  <!-- title and tagline -->
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+    <text x="370" y="170" font-size="52" font-weight="700" fill="#ffffff">hermes-whatsapp-voice</text>
+    <text x="372" y="222" font-size="26" fill="#d1d7db">Call your Hermes agent on WhatsApp.</text>
+    <text x="372" y="258" font-size="26" fill="#d1d7db">Or let it call you.</text>
+
+    <!-- tech pills -->
+    <g font-size="17" font-weight="600">
+      <rect x="372" y="296" width="132" height="36" rx="18" fill="#25d366" fill-opacity="0.14" stroke="#25d366" stroke-opacity="0.5"/>
+      <text x="438" y="320" text-anchor="middle" fill="#25d366">Gemini Live</text>
+      <rect x="516" y="296" width="142" height="36" rx="18" fill="#25d366" fill-opacity="0.14" stroke="#25d366" stroke-opacity="0.5"/>
+      <text x="587" y="320" text-anchor="middle" fill="#25d366">Rust sidecar</text>
+      <rect x="670" y="296" width="152" height="36" rx="18" fill="#25d366" fill-opacity="0.14" stroke="#25d366" stroke-opacity="0.5"/>
+      <text x="746" y="320" text-anchor="middle" fill="#25d366">Hermes plugin</text>
+    </g>
+  </g>
+
+  <!-- voice waveform -->
+  <g fill="url(#bar)" transform="translate(1010 200)">
+    <rect x="0" y="-18" width="10" height="36" rx="5"/>
+    <rect x="22" y="-40" width="10" height="80" rx="5"/>
+    <rect x="44" y="-66" width="10" height="132" rx="5"/>
+    <rect x="66" y="-30" width="10" height="60" rx="5"/>
+    <rect x="88" y="-86" width="10" height="172" rx="5"/>
+    <rect x="110" y="-52" width="10" height="104" rx="5"/>
+    <rect x="132" y="-100" width="10" height="200" rx="5"/>
+    <rect x="154" y="-60" width="10" height="120" rx="5"/>
+    <rect x="176" y="-78" width="10" height="156" rx="5"/>
+    <rect x="198" y="-36" width="10" height="72" rx="5"/>
+    <rect x="220" y="-58" width="10" height="116" rx="5"/>
+    <rect x="242" y="-24" width="10" height="48" rx="5"/>
+  </g>
+</svg>
