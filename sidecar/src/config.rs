@@ -25,6 +25,10 @@ pub struct Config {
     pub hermes_api_url: String,
     /// Empty disables ask_hermes.
     pub hermes_api_key: String,
+    /// How long one Hermes run may take before it is abandoned: an owner's request during a
+    /// call, the post-call digest, and the persona briefing. Raise it when real work (test
+    /// runs, audits, long reports) legitimately needs more than three minutes.
+    pub hermes_timeout: Duration,
     pub ring_timeout: Duration,
     pub max_duration: Duration,
     /// End a call after this long with nobody speaking.
@@ -119,6 +123,7 @@ impl Config {
                 .trim_end_matches('/')
                 .to_string(),
             hermes_api_key: var("HERMES_API_KEY", ""),
+            hermes_timeout: parse_duration(&var("HWV_HERMES_TIMEOUT", "180s"))?,
             ring_timeout: parse_duration(&var("HWV_RING_TIMEOUT", "45s"))?,
             max_duration: parse_duration(&var("HWV_MAX_DURATION", "15m"))?,
             silence_timeout: parse_duration(&var("HWV_SILENCE_TIMEOUT", "180s"))?,
