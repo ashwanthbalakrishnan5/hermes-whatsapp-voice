@@ -259,7 +259,7 @@ async fn start_hermes() -> (String, Arc<HermesState>) {
                 }
                 Ok(Json(json!({
                     "session_id": "s1",
-                    "system_instruction": "You are the owner's assistant, in their WhatsApp chat.",
+                    "system_instruction": "You are the owner's assistant, in their WhatsApp chat. The owner lives in Chennai.",
                     "history": [
                         {"role": "user", "parts": [{"text": "Remind me about the dentist."}]},
                         {"role": "model", "parts": [{"text": "Done."}]},
@@ -1014,6 +1014,7 @@ async fn live_model_reports_a_slow_tool_result() {
     phone
         .listen(Duration::from_secs(2), Duration::from_secs(10))
         .await;
+    *sim.hermes.work.lock().unwrap() = Duration::ZERO; // the after-call summary need not wait
     phone.hang_up();
     let r = sim.finished(&id, task).await;
     report(&r);
