@@ -35,6 +35,9 @@ pub struct Setup {
     pub functions: Vec<Value>,
     /// Language codes to pin speech recognition to; empty lets Gemini detect the language.
     pub languages: Vec<String>,
+    /// The language the owner speaks (`speechConfig.languageCode`), which Gemini uses for both
+    /// recognition and the voice; stronger than the `languages` hints. Empty leaves it unset.
+    pub speech_language: String,
     /// Owner-supplied setup fields (the `live_config` setting), merged over the defaults.
     pub overrides: Value,
     /// Earlier conversation as `Content` turns, loaded before the call starts (not on resume).
@@ -85,6 +88,9 @@ impl Setup {
                 None => json!({}),
             },
         });
+        if !self.speech_language.is_empty() {
+            setup["generationConfig"]["speechConfig"]["languageCode"] = json!(self.speech_language);
+        }
         if !self.functions.is_empty() {
             setup["tools"] = json!([{"functionDeclarations": self.functions}]);
         }
@@ -549,6 +555,7 @@ mod tests {
             system_instruction: "be brief".into(),
             functions: vec![json!({"name": "end_call"})],
             languages: vec!["en-US".into(), "ta-IN".into()],
+            speech_language: String::new(),
             overrides: json!({
                 "generationConfig": {"temperature": 0.4, "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": "Puck"}}}},
                 "realtimeInputConfig": {"automaticActivityDetection": {"silenceDurationMs": 900}},
@@ -606,6 +613,19 @@ mod tests {
             m["inputAudioTranscription"]["languageCodes"],
             json!(["en-US", "ta-IN"])
         );
+        assert!(m["generationConfig"]["speechConfig"]["languageCode"].is_null());
+
+        let setup = Setup {
+            voice: "v".into(),
+            speech_language: "ta-IN".into(),
+            ..setup
+        };
+        let speech = &setup.message(None)["setup"]["generationConfig"]["speechConfig"];
+        assert_eq!(speech["languageCode"], "ta-IN");
+        assert_eq!(
+            speech["voiceConfig"]["prebuiltVoiceConfig"]["voiceName"],
+            "v"
+        );
     }
 
     #[test]
@@ -636,6 +656,7 @@ mod tests {
             system_instruction: "be brief".into(),
             functions: vec![json!({"name": "end_call"})],
             languages: vec![],
+            speech_language: String::new(),
             overrides: json!({}),
             history: vec![json!({"role": "user", "parts": [{"text": "hi"}]})],
             vocabulary: vec![],
@@ -671,6 +692,7 @@ mod tests {
                 json!({"name": "end_call", "description": "Hang up.", "behavior": "NON_BLOCKING"}),
             ],
             languages: vec![],
+            speech_language: String::new(),
             overrides: std::env::var("HWV_LIVE_CONFIG")
                 .map(|raw| serde_json::from_str(&raw).expect("HWV_LIVE_CONFIG JSON"))
                 .unwrap_or_else(|_| json!({})),

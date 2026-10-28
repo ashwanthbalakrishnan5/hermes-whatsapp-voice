@@ -58,7 +58,13 @@ config_schema:
     type: str
     default: ""
     label: "Languages"
-    description: "Comma-separated language codes the voice may speak and listen for, e.g. en-US, ta-IN. Empty: any language."
+    description: "Comma-separated language codes the voice may speak, e.g. en-US, ta-IN. Speech recognition takes them only as hints; if it mishears you, also set Main spoken language. Empty: any language."
+  speech_language:
+    type: str
+    default: ""
+    choices: ["", "en-US", "en-IN", "en-GB", "en-AU", "ta-IN", "hi-IN", "te-IN", "kn-IN", "ml-IN", "mr-IN", "bn-IN", "gu-IN", "de-DE", "es-US", "es-ES", "fr-FR", "fr-CA", "it-IT", "pt-BR", "nl-NL", "pl-PL", "ru-RU", "tr-TR", "ar-XA", "id-ID", "vi-VN", "th-TH", "ja-JP", "ko-KR", "cmn-CN"]
+    label: "Main spoken language"
+    description: "The language you mostly speak on calls. Gemini uses it to recognise your speech and for its own voice, and it is much stronger than the Languages hints. Blank lets Gemini detect it."
   voice_instructions:
     type: str
     default: ""

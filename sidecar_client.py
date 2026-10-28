@@ -28,6 +28,7 @@ SETTINGS: dict[str, Any] = {
     "voice": "Kore",
     "assistant_name": "Hermes",
     "languages": "",
+    "speech_language": "",
     "voice_instructions": "",
     "voice_tools": "memory, session_search, skills_list, skill_view, web_search, web_extract, read_file, "
     "search_files, todo_list, hindsight_recall, hindsight_retain, hindsight_reflect",
@@ -160,6 +161,7 @@ def sidecar_env(ctx) -> dict[str, str]:
         "HWV_VOICE": str(s["voice"]),
         "HWV_ASSISTANT_NAME": str(s["assistant_name"]),
         "HWV_LANGUAGES": str(s["languages"]),
+        "HWV_SPEECH_LANGUAGE": str(s["speech_language"]),
         "HWV_VOICE_INSTRUCTIONS": str(s["voice_instructions"]),
         "HWV_LIVE_CONFIG": json.dumps(s["live_config"] or {}),
         "HWV_LISTEN": str(s["listen"]),

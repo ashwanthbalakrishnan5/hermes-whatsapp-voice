@@ -18,7 +18,7 @@
   // Settings are grouped here; any key not listed lands in Advanced.
   const GROUPS = [
     { title: "You", keys: ["owner_number"] },
-    { title: "Voice", keys: ["voice_model", "voice", "assistant_name", "languages", "vocabulary", "voice_instructions"] },
+    { title: "Voice", keys: ["voice_model", "voice", "assistant_name", "languages", "speech_language", "vocabulary", "voice_instructions"] },
     { title: "Chat context", keys: ["context_mode", "history_chars", "voice_tools"] },
     { title: "Calls", keys: ["ring_timeout_seconds", "max_call_minutes", "silence_hangup_seconds", "hangup_grace_seconds", "hermes_timeout_seconds", "max_silent_tools", "answer_inbound", "send_summary", "record_calls"] },
   ];
@@ -230,7 +230,7 @@
     }
     let input;
     if (spec.choices) {
-      input = h("select", { className: "hwv-select", value, onChange: (e) => onChange(e.target.value) }, ...spec.choices.map((c) => h("option", { key: c, value: c }, c)));
+      input = h("select", { className: "hwv-select", value, onChange: (e) => onChange(e.target.value) }, ...spec.choices.map((c) => h("option", { key: c, value: c }, c || "(automatic)")));
     } else if (type === "dict") {
       input = h("textarea", { className: "hwv-textarea is-code", spellCheck: false, value, onChange: (e) => onChange(e.target.value) });
     } else if (name === "voice_instructions") {

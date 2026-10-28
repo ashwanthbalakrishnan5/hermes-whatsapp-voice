@@ -394,6 +394,7 @@ fn test_config(gemini_url: &str, hermes_url: &str) -> Config {
         assistant_name: "Hermes".into(),
         voice_instructions: String::new(),
         languages: vec![],
+        speech_language: String::new(),
         live_config: json!({}),
         hermes_api_url: hermes_url.into(),
         hermes_api_key: "test-key".into(),
@@ -834,43 +835,292 @@ async fn records_the_owner_audio_when_enabled() {
 }
 
 // ---- the real voice model (opt-in: costs a few cents per run) ----------------------------------
+//
+// The same harness against the real Gemini Live, with the sidecar's real setup and a fake Hermes.
+// Run before a release, or to try a model or a language setting:
+//   GEMINI_API_KEY=... cargo test live_model -- --ignored --nocapture --test-threads=1
+// HWV_MODEL picks the model; HWV_LANGUAGES / HWV_SPEECH_LANGUAGE the language settings under test.
+// The owner's lines are synthetic voices in tests/audio; HWV_TEST_AUDIO adds your own recording
+// (16 kHz mono WAV, e.g. from record_calls).
 
-/// The real model answers on time, with the sidecar's real setup. Run before a release or when
-/// trying a new model:
-///   GEMINI_API_KEY=... [HWV_MODEL=...] [HWV_TEST_AUDIO=question.wav] cargo test live_model -- --ignored --nocapture
-/// HWV_TEST_AUDIO is a 16 kHz mono WAV of a spoken question, e.g. a call saved with record_calls.
+async fn live_sim(core: bool) -> Sim {
+    let key = std::env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY");
+    let env = |name: &str| std::env::var(name).ok();
+    Sim::new(core, |c| {
+        c.gemini_url = crate::gemini::ENDPOINT.into();
+        c.gemini_api_key = key;
+        c.model = env("HWV_MODEL").unwrap_or(c.model.clone());
+        c.languages = crate::config::list(&env("HWV_LANGUAGES").unwrap_or("en-US, ta-IN".into()));
+        c.speech_language = env("HWV_SPEECH_LANGUAGE").unwrap_or_default();
+        c.silence_timeout = Duration::from_secs(60);
+        c.hangup_grace = Duration::from_secs(2);
+    })
+    .await
+}
+
+fn audio(name: &str) -> Vec<i16> {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/audio");
+    read_wav(&dir.join(format!("{name}.wav"))).unwrap().1
+}
+
+impl Phone {
+    /// Speaks a line in real time, then a second of silence so the model takes its turn.
+    async fn say(&self, pcm: &[i16]) {
+        self.play(pcm).await;
+        self.play(&vec![0; 16_000]).await;
+    }
+
+    /// Listens until the assistant has been quiet for `quiet` (or `within` runs out); returns
+    /// whether it said anything meanwhile.
+    async fn listen(&self, quiet: Duration, within: Duration) -> bool {
+        let (mut spoke, mut last) = (false, Instant::now());
+        let deadline = Instant::now() + within;
+        while Instant::now() < deadline && last.elapsed() < quiet {
+            let Ok(Ok(frame)) =
+                tokio::time::timeout(Duration::from_millis(200), self.from_bot.recv()).await
+            else {
+                continue;
+            };
+            if frame.iter().any(|s| s.abs() > 100) {
+                (spoke, last) = (true, Instant::now());
+            }
+        }
+        spoke
+    }
+}
+
+/// The owner's turns that contain a script other than Tamil or Latin (the "Hindi and Japanese"
+/// transcripts seen on real calls).
+fn foreign_turns(r: &CallRecord) -> Vec<String> {
+    let ok = |c: char| c.is_ascii() || ('\u{0B80}'..='\u{0BFF}').contains(&c) || !c.is_alphabetic();
+    r.transcript
+        .iter()
+        .filter(|t| t.role == "owner" && !t.text.chars().all(ok))
+        .map(|t| t.text.clone())
+        .collect()
+}
+
+fn report(r: &CallRecord) {
+    println!(
+        "--- transcript\n{}\n--- metrics\n{:#?}",
+        r.transcript_text(),
+        r.metrics
+    );
+}
+
 #[tokio::test]
 #[ignore]
 async fn live_model_greets_and_answers_on_time() {
-    let key = std::env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY");
-    let sim = Sim::new(false, |c| {
-        c.gemini_url = crate::gemini::ENDPOINT.into();
-        c.gemini_api_key = key;
-        if let Ok(model) = std::env::var("HWV_MODEL") {
-            c.model = model;
-        }
-    })
-    .await;
+    let sim = live_sim(false).await;
     let (id, phone, task) = sim.call();
     assert!(
-        phone.hears_speech(Duration::from_secs(5)).await,
-        "no greeting within 5 s"
+        phone
+            .listen(Duration::from_millis(1500), Duration::from_secs(15))
+            .await,
+        "no greeting"
     );
-    if let Ok(path) = std::env::var("HWV_TEST_AUDIO") {
-        let (rate, pcm) = read_wav(std::path::Path::new(&path)).unwrap();
-        assert_eq!(rate, 16_000, "HWV_TEST_AUDIO must be 16 kHz mono");
-        tokio::time::sleep(Duration::from_secs(3)).await; // let the greeting finish
-        phone.play(&pcm).await;
-        phone.play(&vec![0; 16_000]).await; // a second of silence ends the owner's turn
+    phone.say(&audio("en_weather")).await;
+    assert!(
+        phone
+            .listen(Duration::from_secs(3), Duration::from_secs(20))
+            .await,
+        "no answer"
+    );
+    phone.hang_up();
+    let r = sim.finished(&id, task).await;
+    report(&r);
+    assert!(
+        r.metrics.first_audio_ms.is_some_and(|ms| ms < 5000),
+        "slow greeting"
+    );
+    assert!(
+        !r.metrics.reply_ms.is_empty() && r.metrics.reply_ms.iter().all(|&ms| ms < 5000),
+        "slow reply"
+    );
+    let heard = r
+        .transcript
+        .iter()
+        .filter(|t| t.role == "owner")
+        .map(|t| t.text.to_lowercase());
+    assert!(
+        heard.collect::<String>().contains("weather"),
+        "misheard the question"
+    );
+}
+
+/// Checks the language settings: Tamil and Tamil-English speech must come out as Tamil or
+/// English, not another language. Try settings with HWV_LANGUAGES / HWV_SPEECH_LANGUAGE.
+#[tokio::test]
+#[ignore]
+async fn live_model_hears_tamil_and_mixed_speech() {
+    let sim = live_sim(false).await;
+    let (id, phone, task) = sim.call();
+    assert!(
+        phone
+            .listen(Duration::from_millis(1500), Duration::from_secs(15))
+            .await,
+        "no greeting"
+    );
+    for line in ["ta_weather", "mixed_meeting"] {
+        phone.say(&audio(line)).await;
         assert!(
-            phone.hears_speech(Duration::from_secs(8)).await,
-            "no answer"
+            phone
+                .listen(Duration::from_secs(3), Duration::from_secs(20))
+                .await,
+            "no answer to {line}"
         );
-        tokio::time::sleep(Duration::from_secs(4)).await;
     }
     phone.hang_up();
     let r = sim.finished(&id, task).await;
-    println!("{}\n{:#?}", r.transcript_text(), r.metrics);
-    assert!(r.metrics.first_audio_ms.is_some_and(|ms| ms < 5000));
-    assert!(r.metrics.reply_ms.iter().all(|&ms| ms < 5000), "slow reply");
+    report(&r);
+    assert!(
+        r.transcript.iter().filter(|t| t.role == "owner").count() >= 2,
+        "owner speech not transcribed"
+    );
+    assert_eq!(
+        foreign_turns(&r),
+        Vec::<String>::new(),
+        "transcribed in the wrong language"
+    );
+}
+
+/// A request that takes Hermes 8 s: the model must hand it over, keep the line alive, and report
+/// the result when it comes.
+#[tokio::test]
+#[ignore]
+async fn live_model_reports_a_slow_tool_result() {
+    let sim = live_sim(false).await;
+    *sim.hermes.work.lock().unwrap() = Duration::from_secs(8);
+    let (id, phone, task) = sim.call();
+    assert!(
+        phone
+            .listen(Duration::from_millis(1500), Duration::from_secs(15))
+            .await,
+        "no greeting"
+    );
+    phone.say(&audio("en_weather")).await;
+    let deadline = Instant::now() + Duration::from_secs(40);
+    let reported = || {
+        let r = sim.record(&id);
+        r.transcript
+            .iter()
+            .any(|t| t.role == "assistant" && t.text.to_lowercase().contains("sunny"))
+    };
+    while !reported() && Instant::now() < deadline {
+        phone
+            .listen(Duration::from_secs(1), Duration::from_secs(1))
+            .await;
+    }
+    phone
+        .listen(Duration::from_secs(2), Duration::from_secs(10))
+        .await;
+    phone.hang_up();
+    let r = sim.finished(&id, task).await;
+    report(&r);
+    let asked = sim.hermes.bodies("/v1/runs");
+    assert!(
+        asked.iter().any(|b| b["input"]
+            .as_str()
+            .unwrap()
+            .to_lowercase()
+            .contains("weather")),
+        "never asked Hermes"
+    );
+    assert!(reported(), "never told the owner the result");
+    assert_eq!(r.metrics.ended_by, "phone", "hung up on its own");
+}
+
+/// The owner's "bye" ends the call from the assistant's side.
+#[tokio::test]
+#[ignore]
+async fn live_model_hangs_up_after_goodbye() {
+    let sim = live_sim(false).await;
+    let (id, phone, task) = sim.call();
+    assert!(
+        phone
+            .listen(Duration::from_millis(1500), Duration::from_secs(15))
+            .await,
+        "no greeting"
+    );
+    phone.say(&audio("en_bye")).await;
+    let ended = tokio::time::timeout(Duration::from_secs(30), async {
+        while sim.record(&id).status == Status::InProgress {
+            phone
+                .listen(Duration::from_millis(500), Duration::from_millis(500))
+                .await;
+        }
+    })
+    .await;
+    phone.hang_up();
+    let r = sim.finished(&id, task).await;
+    report(&r);
+    assert!(
+        ended.is_ok(),
+        "still on the line 30 s after the owner said bye"
+    );
+    assert_eq!(r.metrics.ended_by, "assistant");
+}
+
+/// Chat-session mode's setup (history, the chat's tools, ask_hermes_deep) is accepted, and the
+/// model uses a tool for a question it cannot answer itself.
+#[tokio::test]
+#[ignore]
+async fn live_model_works_in_chat_session_mode() {
+    let sim = live_sim(true).await;
+    let (id, phone, task) = sim.call();
+    assert!(
+        phone
+            .listen(Duration::from_millis(1500), Duration::from_secs(15))
+            .await,
+        "no greeting"
+    );
+    phone.say(&audio("en_weather")).await;
+    assert!(
+        phone
+            .listen(Duration::from_secs(4), Duration::from_secs(30))
+            .await,
+        "no answer"
+    );
+    phone.hang_up();
+    let r = sim.finished(&id, task).await;
+    report(&r);
+    assert!(sim.hermes.paths().contains(&"/voice/start".to_string()));
+    assert!(
+        r.metrics.tool_calls >= 1,
+        "answered a live question without a tool"
+    );
+}
+
+/// Your own recorded voice (HWV_TEST_AUDIO): it must be understood and answered.
+#[tokio::test]
+#[ignore]
+async fn live_model_answers_your_recording() {
+    let Ok(path) = std::env::var("HWV_TEST_AUDIO") else {
+        return println!("HWV_TEST_AUDIO not set; skipped");
+    };
+    let (rate, pcm) = read_wav(std::path::Path::new(&path)).unwrap();
+    assert_eq!(rate, 16_000, "HWV_TEST_AUDIO must be 16 kHz mono");
+    let sim = live_sim(false).await;
+    let (id, phone, task) = sim.call();
+    assert!(
+        phone
+            .listen(Duration::from_millis(1500), Duration::from_secs(15))
+            .await,
+        "no greeting"
+    );
+    phone.say(&pcm).await;
+    assert!(
+        phone
+            .listen(Duration::from_secs(3), Duration::from_secs(20))
+            .await,
+        "no answer"
+    );
+    phone.hang_up();
+    let r = sim.finished(&id, task).await;
+    report(&r);
+    assert_eq!(
+        foreign_turns(&r),
+        Vec::<String>::new(),
+        "transcribed in the wrong language"
+    );
 }

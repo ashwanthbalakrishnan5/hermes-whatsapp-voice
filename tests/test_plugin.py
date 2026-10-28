@@ -117,6 +117,7 @@ def test_sidecar_env(plugin):
     assert env["HWV_RING_TIMEOUT"] == "45s"
     assert env["HWV_LIVE_CONFIG"] == "{}"
     assert env["HWV_LANGUAGES"] == ""
+    assert env["HWV_SPEECH_LANGUAGE"] == ""
     assert env["HWV_SILENCE_TIMEOUT"] == "180s"
     assert env["HWV_HERMES_TIMEOUT"] == "180s"
     assert env["HWV_HANGUP_GRACE"] == "3s"

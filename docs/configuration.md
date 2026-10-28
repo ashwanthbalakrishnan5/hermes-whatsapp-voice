@@ -18,7 +18,8 @@ Restart the sidecar after a change: the dashboard's **Restart sidecar** button, 
 | `voice_model` | `gemini-3.8-live` | Gemini Live model |
 | `voice` | `Kore` | Gemini prebuilt voice |
 | `assistant_name` | `Hermes` | Fallback name when Hermes gives no persona briefing |
-| `languages` | (empty) | Language codes the voice may speak and listen for, e.g. `en-US, ta-IN`; empty allows any |
+| `languages` | (empty) | Language codes the voice may speak, e.g. `en-US, ta-IN`. Speech recognition only takes them as hints; set `speech_language` too if it mishears your language |
+| `speech_language` | (automatic) | Your main spoken language, one code (e.g. `ta-IN`). Gemini uses it for recognising your speech and for its voice; much stronger than `languages`, which are only hints |
 | `voice_instructions` | (empty) | Your own extra rules for the voice: language, tone, call length |
 | `vocabulary` | (empty) | Words transcripts should spell as given, e.g. names; your own name is added automatically |
 | `voice_tools` | memory, skills, web, file reading, Hindsight… | `core_session`: tools the voice uses itself for quick lookups (only those your chat has); real jobs go to your main model |
