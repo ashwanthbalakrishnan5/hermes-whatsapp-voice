@@ -11,6 +11,7 @@ mod config;
 mod core;
 mod gemini;
 mod hermes;
+mod owner;
 mod server;
 
 use std::sync::Arc;

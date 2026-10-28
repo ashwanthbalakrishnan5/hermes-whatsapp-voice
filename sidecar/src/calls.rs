@@ -5,7 +5,7 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use anyhow::{Result, bail};
+use anyhow::{Result, anyhow, bail};
 use serde::Serialize;
 use serde_json::{Value, json};
 use tokio::sync::{mpsc, watch};
@@ -21,8 +21,11 @@ use crate::config::Config;
 use crate::core::{self, Core};
 use crate::gemini::{Live, LiveEvent, Setup};
 use crate::hermes::Hermes;
+use crate::owner::Owner;
 
 const KEEP_RECORDS: usize = 50;
+/// Bound on the WhatsApp query that resolves the owner's canonical identity.
+const OWNER_LOOKUP_TIMEOUT: Duration = Duration::from_secs(10);
 const FRAME_INTERVAL: Duration = Duration::from_millis(60);
 const STILL_CONNECTED: &str = "(The call is still connected: the owner spoke after your goodbye. \
     Answer them, and call end_call again once they are done.)";
@@ -457,6 +460,7 @@ pub struct Bridge {
     /// None in tests, which drive calls without WhatsApp.
     pub client: Option<Arc<Client>>,
     pub calls: Calls,
+    owner: Owner,
     pub ring_signals: RingSignals,
     hermes: Option<Hermes>,
     /// Hermes's own briefing on who it is and who the owner is; empty until fetched.
@@ -470,6 +474,7 @@ impl Bridge {
         let hermes = (!cfg.hermes_api_key.is_empty())
             .then(|| Hermes::new(&cfg.hermes_api_url, &cfg.hermes_api_key));
         Self {
+            owner: Owner::new(Jid::pn(cfg.owner.as_str())),
             cfg,
             client,
             calls: Calls::default(),
@@ -536,32 +541,51 @@ impl Bridge {
         Jid::pn(self.cfg.owner.as_str())
     }
 
-    /// Whether an incoming offer comes from the owner's number.
+    /// Authenticated canonical (PN, LID) pair for the configured owner PN: WhatsApp's own answer
+    /// to a bounded query of that one number. Never inferred from an inbound identity.
+    async fn lookup_owner(&self) -> Result<(Jid, Jid)> {
+        let client = self
+            .client
+            .as_ref()
+            .ok_or_else(|| anyhow!("WhatsApp is not connected"))?;
+        let results = tokio::time::timeout(
+            OWNER_LOOKUP_TIMEOUT,
+            client.contacts().is_on_whatsapp(&[self.owner_jid()]),
+        )
+        .await??;
+        let [result] = results.as_slice() else {
+            bail!(
+                "owner lookup returned {} results, expected 1",
+                results.len()
+            );
+        };
+        let pn = result.pn_jid.as_ref().unwrap_or(&result.jid);
+        crate::owner::verified_identity(
+            result.is_registered,
+            pn,
+            result.lid.as_ref(),
+            result.contact_error.is_some() || result.lid_error.is_some(),
+        )
+    }
+
+    /// Whether an incoming offer comes from the owner. The configured number is accepted as is;
+    /// any other identity (such as the owner's LID) is checked against the authenticated pair.
+    /// Every identity on the offer must belong to the owner.
     pub async fn is_owner(
         &self,
         call: &IncomingCall,
         creator: &Jid,
         caller_pn: Option<&Jid>,
     ) -> bool {
-        for jid in caller_pn.into_iter().chain([creator, &call.from]) {
-            if jid.is_pn() {
-                return jid.user == self.cfg.owner;
-            }
+        let candidates: Vec<&Jid> = caller_pn.into_iter().chain([creator, &call.from]).collect();
+        let owner = self
+            .owner
+            .matches(&candidates, || self.lookup_owner())
+            .await;
+        if !owner {
+            log::warn!("call from {creator} does not match the owner's identity");
         }
-        let Some(client) = &self.client else {
-            return false;
-        };
-        for jid in [creator, &call.from] {
-            if jid.is_lid()
-                && let Ok(Some(entry)) = client.get_lid_pn_entry(jid).await
-            {
-                return *entry.phone_number == *self.cfg.owner;
-            }
-        }
-        log::warn!(
-            "call from {creator}: no phone number known for this LID, so it cannot be matched to the owner"
-        );
-        false
+        owner
     }
 
     /// Validates and registers an outbound call; the caller spawns `run_outbound`.
@@ -577,10 +601,12 @@ impl Bridge {
         };
         let (mic_tx, mic_rx) = async_channel::bounded::<Vec<i16>>(8);
         let (spk_tx, spk_rx) = async_channel::bounded::<Vec<i16>>(64);
+        // The canonical LID when WhatsApp confirms it; the configured number if the lookup fails.
+        let target = self.owner.dial_target(|| self.lookup_owner()).await;
         self.ring_signals.start();
         let started = client
             .voip()
-            .call(&self.owner_jid())
+            .call(&target)
             .audio(mic_rx, spk_tx)
             .start()
             .await;
