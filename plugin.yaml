@@ -1,7 +1,7 @@
 name: hermes-whatsapp-voice
 label: WhatsApp Voice Calls
 kind: standalone
-version: 0.2.0
+version: 0.2.1
 manifest_version: 2
 api_version: 1
 description: >-
@@ -13,10 +13,12 @@ license: MIT
 homepage: https://github.com/ashwanthbalakrishnan5/hermes-whatsapp-voice
 tags: [whatsapp, voice, calls, gemini-live]
 platforms: [linux, macos]
-requires_hermes: ">=0.21.5"
+requires_hermes: ">=0.21.6"
 provides_tools:
   - whatsapp_call_owner
   - whatsapp_call_status
+provides_hooks:
+  - pre_gateway_dispatch
 # Gemini: reuses the key of Hermes's own Gemini provider (GOOGLE_API_KEY, else GEMINI_API_KEY).
 optional_env:
   - name: GOOGLE_API_KEY

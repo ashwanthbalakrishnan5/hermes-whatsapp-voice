@@ -109,7 +109,7 @@ def test_call_instructions_name_the_session_tools_and_rules(cs):
         owner_name="Sam", tools=["memory", "terminal"], reason="Server down", details="", direction="outbound",
         voice_instructions="Keep it short.", languages=["en-US", "ta-IN"],
     )  # fmt: skip
-    assert "speaking with Sam" in text and "memory, terminal" in text and cs.DEEP_TOOL in text
+    assert "voice call with Sam" in text and "memory, terminal" in text and cs.DEEP_TOOL in text
     assert "Never say you are a separate agent" in text and "end_call" in text
     assert "Speak only these languages: en-US, ta-IN" in text and "Keep it short." in text
     assert "You placed this call. Reason: Server down" in text

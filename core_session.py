@@ -140,7 +140,7 @@ def call_instructions(*, owner_name: str, tools: list[str], reason: str, details
     lines = [
         "## Live voice call",
         (
-            f"You are now speaking with {owner} on a live WhatsApp voice call. This call is part of the "
+            f"This is a live WhatsApp voice call with {owner}. The call is part of the "
             "same WhatsApp conversation as the text chat above: the history you were given is that chat, "
             "and everything said on this call is saved back into it. You are the same assistant, with the "
             "same name and persona as described above. Never say you are a separate agent or a different "

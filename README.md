@@ -100,7 +100,7 @@ transcript and timing (`hermes whatsapp-voice calls`).
 
 ### Requirements
 
-- Hermes `>= 0.21.5` on Linux or macOS.
+- Hermes `>= 0.21.6` on Linux or macOS.
 - A separate WhatsApp number for the bot: Hermes's WhatsApp `bot` mode, or any spare number. In
   `self-chat` mode the bot is your own number, and you can't call yourself.
 - Gemini set up in Hermes with an API key. The plugin reuses the key of Hermes's Gemini provider

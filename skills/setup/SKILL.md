@@ -24,7 +24,7 @@ coding agent: https://github.com/ashwanthbalakrishnan5/hermes-whatsapp-voice/blo
 ## 0. Check the prerequisites
 
 ```bash
-hermes --version                     # expect 0.21.5 or newer
+hermes --version                     # expect 0.21.6 or newer
 grep -E '^WHATSAPP_MODE=' ~/.hermes/.env
 grep -cE '^(GOOGLE_API_KEY|GEMINI_API_KEY)=' ~/.hermes/.env   # expect 1 or more
 ```
