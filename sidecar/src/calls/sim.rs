@@ -395,6 +395,7 @@ fn test_config(gemini_url: &str, hermes_url: &str) -> Config {
         voice_instructions: String::new(),
         languages: vec![],
         speech_language: String::new(),
+        pause_ms: 600,
         live_config: json!({}),
         hermes_api_url: hermes_url.into(),
         hermes_api_key: "test-key".into(),

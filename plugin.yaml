@@ -85,6 +85,11 @@ config_schema:
     default: 180
     label: "Hang up after silence (seconds)"
     description: "Ends a call when nobody has spoken for this long, e.g. left on hold."
+  pause_before_reply_ms:
+    type: int
+    default: 600
+    label: "Pause before it replies (ms)"
+    description: "How long you can pause mid-sentence before the voice takes it that you have finished and answers. Raise it if it cuts you off; lower it for snappier replies."
   hangup_grace_seconds:
     type: int
     default: 3

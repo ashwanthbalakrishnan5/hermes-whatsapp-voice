@@ -121,6 +121,7 @@ def test_sidecar_env(plugin):
     assert env["HWV_SILENCE_TIMEOUT"] == "180s"
     assert env["HWV_HERMES_TIMEOUT"] == "180s"
     assert env["HWV_HANGUP_GRACE"] == "3s"
+    assert env["HWV_PAUSE_MS"] == "600"
     assert env["HWV_MAX_SILENT_TOOLS"] == "5"
     assert env["HWV_RECORD_CALLS"] == "false"
     assert env["HWV_GEMINI_URL"].startswith("wss://")

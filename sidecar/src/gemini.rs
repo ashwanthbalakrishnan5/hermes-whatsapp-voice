@@ -38,6 +38,8 @@ pub struct Setup {
     /// The language the owner speaks (`speechConfig.languageCode`), which Gemini uses for both
     /// recognition and the voice; stronger than the `languages` hints. Empty leaves it unset.
     pub speech_language: String,
+    /// How long the owner may pause before their turn counts as over and the model replies.
+    pub pause_ms: u32,
     /// Owner-supplied setup fields (the `live_config` setting), merged over the defaults.
     pub overrides: Value,
     /// Earlier conversation as `Content` turns, loaded before the call starts (not on resume).
@@ -79,7 +81,7 @@ impl Setup {
             "inputAudioTranscription": self.transcription(true),
             "outputAudioTranscription": self.transcription(false),
             "realtimeInputConfig": {
-                "automaticActivityDetection": {"silenceDurationMs": 600},
+                "automaticActivityDetection": {"silenceDurationMs": self.pause_ms},
                 "activityHandling": "START_OF_ACTIVITY_INTERRUPTS",
             },
             "contextWindowCompression": {"slidingWindow": {}},
@@ -556,6 +558,7 @@ mod tests {
             functions: vec![json!({"name": "end_call"})],
             languages: vec!["en-US".into(), "ta-IN".into()],
             speech_language: String::new(),
+            pause_ms: 600,
             overrides: json!({
                 "generationConfig": {"temperature": 0.4, "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": "Puck"}}}},
                 "realtimeInputConfig": {"automaticActivityDetection": {"silenceDurationMs": 900}},
@@ -657,6 +660,7 @@ mod tests {
             functions: vec![json!({"name": "end_call"})],
             languages: vec![],
             speech_language: String::new(),
+            pause_ms: 750,
             overrides: json!({}),
             history: vec![json!({"role": "user", "parts": [{"text": "hi"}]})],
             vocabulary: vec![],
@@ -676,6 +680,10 @@ mod tests {
             m["setup"]["generationConfig"]["responseModalities"][0],
             "AUDIO"
         );
+        assert_eq!(
+            m["setup"]["realtimeInputConfig"]["automaticActivityDetection"]["silenceDurationMs"],
+            750
+        );
     }
 
     /// Live check against the real API: `GEMINI_API_KEY=... cargo test -- --ignored`.
@@ -693,6 +701,7 @@ mod tests {
             ],
             languages: vec![],
             speech_language: String::new(),
+            pause_ms: 600,
             overrides: std::env::var("HWV_LIVE_CONFIG")
                 .map(|raw| serde_json::from_str(&raw).expect("HWV_LIVE_CONFIG JSON"))
                 .unwrap_or_else(|_| json!({})),

@@ -24,6 +24,8 @@ pub struct Config {
     pub languages: Vec<String>,
     /// The owner's main spoken language (one code, e.g. ta-IN); empty leaves it to Gemini.
     pub speech_language: String,
+    /// Owner pause (ms) that ends their turn.
+    pub pause_ms: u32,
     /// Raw Gemini Live setup fields (JSON object) merged over the defaults.
     pub live_config: serde_json::Value,
     pub hermes_api_url: String,
@@ -138,6 +140,9 @@ impl Config {
             voice_instructions: var("HWV_VOICE_INSTRUCTIONS", ""),
             languages: list(&var("HWV_LANGUAGES", "")),
             speech_language: var("HWV_SPEECH_LANGUAGE", "").trim().to_string(),
+            pause_ms: var("HWV_PAUSE_MS", "600")
+                .parse()
+                .context("HWV_PAUSE_MS must be a whole number of milliseconds")?,
             live_config: live_config(&var("HWV_LIVE_CONFIG", "{}"))?,
             hermes_api_url: var("HERMES_API_URL", "http://127.0.0.1:8642")
                 .trim_end_matches('/')

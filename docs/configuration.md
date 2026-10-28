@@ -28,6 +28,7 @@ Restart the sidecar after a change: the dashboard's **Restart sidecar** button, 
 | `ring_timeout_seconds` | `45` | How long an outbound call rings |
 | `max_call_minutes` | `15` | Hard cap per call |
 | `silence_hangup_seconds` | `180` | End a call when nobody has spoken for this long (e.g. left on hold) |
+| `pause_before_reply_ms` | `600` | How long you can pause before the voice takes your turn as over and replies; raise it if it cuts you off |
 | `hangup_grace_seconds` | `3` | Quiet time after the assistant's goodbye before it hangs up; speaking in it keeps the call up |
 | `hermes_timeout_seconds` | `180` | How long the voice waits for Hermes on one request, and for the call summary |
 | `max_silent_tools` | `5` | Tools the voice may run in a row before it must tell you what it is doing |
