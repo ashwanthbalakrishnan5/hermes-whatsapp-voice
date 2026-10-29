@@ -277,8 +277,10 @@ voice takes its name and personality from your own Hermes. Full reference:
 - **Chat-session mode** (`context_mode: core_session`, off by default). `serve` also runs a
   loopback service (`context_listen`, same token) inside Hermes's own process. For each call it
   sends Gemini your WhatsApp chat's system prompt, recent history (`history_chars`) and the tool
-  schemas of `voice_tools`, runs the voice's tool calls through Hermes in that chat, and writes the
-  call into the chat. It relies on Hermes internals listed in `CORE_PATCHES.md`.
+  schemas of `voice_tools`, runs the voice's tool calls through Hermes in that chat (only tools
+  listed in `voice_tools`), and writes the call into the chat. It never answers Hermes's approval
+  prompts: a command that needs approval is denied, and the voice tells you to ask again in the text
+  chat. It relies on Hermes internals listed in `CORE_PATCHES.md`.
 - **Recordings** (`record_calls`, off by default) save your side of each call as a WAV file in the
   plugin's private data folder. Nothing is uploaded; delete them any time.
 - **Secrets** are read through Hermes (`get_secret`) and passed to the sidecar in its environment.

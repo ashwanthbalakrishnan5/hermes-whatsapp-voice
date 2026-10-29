@@ -4,7 +4,7 @@ Runs inside `hermes whatsapp-voice serve` (Hermes's own interpreter, so Hermes m
 state.db is opened with Hermes's SQLite). The sidecar calls this loopback service to:
 
 - start a call: get the session's own system prompt, recent history and tool schemas (/voice/start)
-- run a tool through Hermes's dispatcher, in that session (/voice/tool, /voice/approve)
+- run a tool through Hermes's dispatcher, in that session (/voice/tool)
 - run a full Hermes turn in that session for heavy work (/voice/deep)
 - write the call back into the session's history as it happens (/voice/events, /voice/end)
 
@@ -29,10 +29,15 @@ from typing import Any
 log = logging.getLogger("hermes_whatsapp_voice.core_session")
 
 DEEP_TOOL = "ask_hermes_deep"
-APPROVE_TOOL = "approve_command"
 VOICE_KIND = "voice_call"
 USER_PREFIX = "[Voice call] "
 TEXT_PREFIX = "[Texted during the voice call] "
+# Hermes's approval prompts belong to its own surfaces, so the call never answers one.
+APPROVAL_NOTE = (
+    "This was blocked because it needs the owner's approval, which cannot be given on a call. Tell the owner "
+    "it needs their approval and that they should ask for it again in the WhatsApp text chat, where they can "
+    "approve it. Do not retry it on the call."
+)
 TOOL_TIMEOUT = 120.0
 DEEP_TIMEOUT = 600.0
 
@@ -175,8 +180,8 @@ def call_instructions(*, owner_name: str, tools: list[str], reason: str, details
             "turned out, including when you could not do it, before the call ends."
         ),
         (
-            f"- If a tool result says a command needs approval, tell the owner briefly what it would do, ask "
-            f"them, and call {APPROVE_TOOL} with their answer."
+            "- Commands that need the owner's approval can't be approved on a call. If one is blocked, tell the "
+            "owner to ask for it again in the WhatsApp text chat, where they can approve it."
         ),
         (
             "- End the call when the owner says goodbye, or once the purpose is done and they have nothing "
@@ -300,11 +305,11 @@ class EventLog:
 
 
 class Job:
-    """A tool run or a deep turn, which may stop half-way to ask for an approval."""
+    """A tool run or a deep turn."""
 
     def __init__(self):
         self.done: Future = Future()
-        self.approval: dict | None = None
+        self.blocked = False  # a command in it needed an approval, which the call refused
         self.changed = threading.Event()
 
 
@@ -374,7 +379,7 @@ class HermesSession:
             session_id=self.session_id, cron_session="",
         )  # fmt: skip
         key_token = set_current_session_key(self.key)
-        register_gateway_notify(self.key, self._on_approval)
+        register_gateway_notify(self.key, self._refuse_approval)
 
         def undo():
             reset_current_session_key(key_token)
@@ -382,12 +387,14 @@ class HermesSession:
 
         return undo
 
-    def _on_approval(self, data: dict) -> None:
+    def _refuse_approval(self, data: dict) -> None:
+        """Hermes's approval notifier for the call: refuses to deliver the prompt, so Hermes itself
+        denies the command (fail-closed). Approvals stay on Hermes's own surfaces."""
         # Called in the thread that hit the approval; a deep turn's tools may run on its own threads.
         job = getattr(self.local, "job", None) or (self.running[-1] if self.running else None)
         if job is not None:
-            job.approval = {"command": data.get("command", ""), "description": data.get("description", "")}
-            job.changed.set()
+            job.blocked = True
+        raise RuntimeError("approvals cannot be answered on a voice call")
 
     def _agent_kwargs(self, ephemeral: str) -> dict:
         from gateway.run import (
@@ -467,7 +474,7 @@ class HermesSession:
     # tools -----------------------------------------------------------------------------------
 
     def _run_job(self, work, timeout: float) -> dict:
-        """Run `work` in a thread; return its result, or an approval request if it stops for one."""
+        """Run `work` in a thread and return its result."""
         job = Job()
         self.running.append(job)
 
@@ -494,31 +501,24 @@ class HermesSession:
             job.changed.clear()
             if job.done.done():
                 try:
-                    return {"result": _result_text(job.done.result())}
+                    reply = {"result": _result_text(job.done.result())}
                 except Exception as e:  # noqa: BLE001
-                    return {"error": f"{type(e).__name__}: {e}"}
-            if job.approval is not None:
-                return {"approval_required": job.approval,
-                        "instruction": f"Ask the owner, then call {APPROVE_TOOL} with their answer."}  # fmt: skip
+                    reply = {"error": f"{type(e).__name__}: {e}"}
+                if job.blocked:
+                    reply["note"] = APPROVAL_NOTE
+                return reply
         return {"error": f"Still running after {int(timeout)} seconds; the result will not reach this call."}
 
     def tool(self, name: str, args: dict, tool_call_id: str) -> dict:
+        # Only the tools the owner listed in voice_tools; the session's agent has many more.
+        if name not in voice_tool_names(self.service.voice_tools):
+            return {"error": f"{name} is not one of the tools allowed on calls."}
+
         def work():
             agent = self.agent.result(timeout=90)
             return agent._invoke_tool(name, args, self.session_id, tool_call_id=tool_call_id)
 
         return self._run_job(work, TOOL_TIMEOUT)
-
-    def approve(self, choice: str) -> dict:
-        from tools.approval import resolve_gateway_approval
-
-        job = next((j for j in self.running if j.approval is not None), None)
-        if job is None:
-            return {"error": "Nothing is waiting for approval."}
-        verdict = {"once": "once", "session": "session", "always": "always"}.get(choice, "deny")
-        job.approval = None
-        resolve_gateway_approval(self.key, verdict)
-        return self._wait(job, DEEP_TIMEOUT)
 
     def deep(self, request: str) -> dict:
         from run_agent import AIAgent
@@ -657,8 +657,6 @@ class Service:
             raise LookupError(f"unknown call {call_id}")
         if path == "/voice/tool":
             return session.tool(body["name"], body.get("args") or {}, str(body.get("id") or ""))
-        if path == "/voice/approve":
-            return session.approve(str(body.get("choice") or "deny"))
         if path == "/voice/deep":
             return session.deep(str(body.get("request") or ""))
         if path == "/voice/events":

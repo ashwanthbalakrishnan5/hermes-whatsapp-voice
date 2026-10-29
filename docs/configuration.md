@@ -91,9 +91,11 @@ session with Hermes:
 - **Context:** the voice gets that session's stored system prompt (persona, memory, skills), its
   session context, and recent history (`history_chars`), loaded before the call starts.
 - **Tools:** the voice handles quick lookups itself with `voice_tools` (no terminal or changes by
-  default), run through Hermes in that session. Real jobs go to `ask_hermes_deep`: a full normal turn
-  of your main model, with all of its tools, in the same session; the voice keeps talking and tells
-  you the outcome. When a command needs approval, the voice asks you and answers with `approve_command`.
+  default), run through Hermes in that session; it cannot run any tool you didn't list. Real jobs go
+  to `ask_hermes_deep`: a full normal turn of your main model, with all of its tools, in the same
+  session; the voice keeps talking and tells you the outcome. Approvals can't be given on a call: a
+  command that needs one is denied, and the voice tells you to ask again in the WhatsApp text chat,
+  where Hermes's own `/approve` applies.
 - **Write-back:** what you and the voice say, and its tool calls, are saved into the session as the
   call goes (marked `display_kind: voice_call`), under Hermes's cross-process turn lock, so your next
   text message continues with the call in context.

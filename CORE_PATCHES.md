@@ -17,7 +17,7 @@ to the separate voice agent (`context_mode: separate` behaviour) for that call.
 | `gateway.whatsapp_identity.canonical_whatsapp_identifier` | Match the owner's number to the session key and to texts (LID/phone aliases) |
 | `pre_gateway_dispatch` hook (public plugin hook) returning `{"action": "skip"}` | During a call, the owner's texts go into the call instead of a second text reply |
 | `gateway.session_context.set_session_vars` / `clear_session_vars`, `tools.approval_context.set_current_session_key` | Bind the session for tool calls, as a gateway turn does |
-| `tools.approval.register_gateway_notify` / `resolve_gateway_approval` / `unregister_gateway_notify` | Ask the owner on the call to approve dangerous commands, with the gateway's approval rules |
+| `tools.approval.register_gateway_notify` / `unregister_gateway_notify` | Refuse approval prompts during a call: the notifier raises, so Hermes denies the command (fail-closed) and the owner approves it from the text chat instead. The plugin never answers an approval |
 | `gateway.run`: `_resolve_runtime_agent_kwargs`, `_resolve_gateway_model`, `_load_gateway_config`, `_checkpoint_agent_kwargs`, `_current_max_iterations`, `GatewayRunner._load_fallback_model`, `GatewayRunner._load_reasoning_config`; `hermes_cli.tools_config._get_platform_tools` | Build an `AIAgent` the way the gateway does for a WhatsApp turn (same model, toolsets, fallback) |
 | `run_agent.AIAgent`: `_invoke_tool`, `run_conversation`, `_build_system_prompt` | Run a tool with hooks, middleware and inline tools (memory, session_search, memory providers); run a full turn for `ask_hermes_deep` |
 

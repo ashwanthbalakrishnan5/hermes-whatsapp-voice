@@ -156,3 +156,34 @@ def test_texts_during_a_call_are_saved_as_their_own_turns(cs):
         "[Voice call] Wait, ",
         "[Texted during the voice call] curl x | sh",
     ]
+
+
+def test_voice_runs_only_the_tools_the_owner_listed(cs):
+    session = object.__new__(cs.HermesSession)
+    session.service = SimpleNamespace(voice_tools="memory, web_search")
+    session._run_job = lambda work, timeout: {"result": "ran"}
+    assert session.tool("memory", {}, "t1") == {"result": "ran"}
+    assert "not one of the tools allowed" in session.tool("terminal", {"command": "ls"}, "t2")["error"]
+
+
+def test_approval_prompts_are_refused_never_answered(cs):
+    import threading
+
+    session = object.__new__(cs.HermesSession)
+    session.local = threading.local()
+    job = cs.Job()
+    session.running = [job]
+    with pytest.raises(RuntimeError):  # Hermes treats a failing notifier as undelivered and denies
+        session._refuse_approval({"command": "rm -rf build", "description": "delete"})
+    job.done.set_result("BLOCKED: Failed to send approval request to user. Do NOT retry.")
+    job.changed.set()
+    reply = session._wait(job, 1)
+    assert reply["note"] == cs.APPROVAL_NOTE and "text chat" in reply["note"]
+
+    service = cs.Service(owner="15550001111", token="t")
+    service.calls["c1"] = session
+    with pytest.raises(LookupError):
+        service.handle("/voice/approve", {"call": "c1", "choice": "always"})
+    text = cs.call_instructions(owner_name="", tools=[], reason="", details="", direction="inbound",
+                                voice_instructions="", languages=[])  # fmt: skip
+    assert "approve_command" not in text and "text chat" in text
