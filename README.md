@@ -248,7 +248,14 @@ voice takes its name and personality from your own Hermes. Full reference:
   Anyone with that file can act as that linked device. Unlink it any time from the bot's phone
   (Linked devices).
 - **Network calls.**
-  - WhatsApp servers (signaling and call media relays).
+  - WhatsApp servers (signaling and call media relays). When an incoming identity does not match
+    the configured owner PN or its cached canonical PN/LID pair, or before the first outgoing call,
+    the sidecar queries WhatsApp for that configured number's canonical identity. Successful results
+    are cached in memory; misses refresh them at most once every 10 seconds. The query times out
+    after 10 seconds. Failed lookups reject unknown incoming identities, but outgoing calls fall back
+    to the configured owner PN. An incoming offer containing both the configured PN and an unknown
+    LID still needs one successful lookup: every supplied identity must belong to the owner. Cached
+    identities last until a successful refresh on an incoming miss or a sidecar restart.
   - `generativelanguage.googleapis.com` (Gemini), using the Gemini key Hermes already has. It
     receives call audio during calls, plus, as text: the persona briefing (Hermes's name,
     personality and what it knows about you), the reason and details of an outgoing call, and the
