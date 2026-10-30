@@ -47,6 +47,10 @@ pub struct Config {
     pub recordings: Option<PathBuf>,
     pub answer_inbound: bool,
     pub send_summary: bool,
+    /// Message the owner when an outbound call is not answered, is declined, or fails to connect.
+    pub voice_fallback_enabled: bool,
+    /// Custom fallback text; empty uses an automatic message built from the call's reason.
+    pub voice_fallback_message: String,
     /// Where the plugin's core-session service listens; empty means the separate-agent mode
     /// (persona briefing + ask_hermes) instead of acting as the owner's DM session.
     pub context_url: String,
@@ -161,6 +165,8 @@ impl Config {
                 .transpose()?,
             answer_inbound: var("HWV_ANSWER_INBOUND", "true") == "true",
             send_summary: var("HWV_SEND_SUMMARY", "true") == "true",
+            voice_fallback_enabled: var("HWV_VOICE_FALLBACK_ENABLED", "true") == "true",
+            voice_fallback_message: var("HWV_VOICE_FALLBACK_MESSAGE", ""),
             context_url: var("HWV_CONTEXT_URL", "").trim_end_matches('/').to_string(),
             vocabulary: list(&var("HWV_VOCABULARY", "")),
         })

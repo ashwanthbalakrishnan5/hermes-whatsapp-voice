@@ -49,6 +49,8 @@ SETTINGS: dict[str, Any] = {
     "voice_api_url": "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent",
     "answer_inbound": True,
     "send_summary": True,
+    "voice_fallback_enabled": True,
+    "voice_fallback_message": "",
 }
 
 
@@ -177,6 +179,8 @@ def sidecar_env(ctx) -> dict[str, str]:
         "HWV_GEMINI_URL": str(s["voice_api_url"]),
         "HWV_ANSWER_INBOUND": "true" if s["answer_inbound"] else "false",
         "HWV_SEND_SUMMARY": "true" if s["send_summary"] else "false",
+        "HWV_VOICE_FALLBACK_ENABLED": "true" if s["voice_fallback_enabled"] else "false",
+        "HWV_VOICE_FALLBACK_MESSAGE": str(s["voice_fallback_message"]),
         "HWV_VOCABULARY": str(s["vocabulary"]),
         "HWV_CONTEXT_URL": f"http://{s['context_listen']}" if s["context_mode"] == "core_session" else "",
         "HWV_DATA_DIR": str(data_dir()),

@@ -122,6 +122,16 @@ config_schema:
     default: true
     label: "Send call summary"
     description: "Message a short WhatsApp summary after each call."
+  voice_fallback_enabled:
+    type: bool
+    default: true
+    label: "Message me if I miss the call"
+    description: "When an outgoing call isn't picked up, is declined, or fails to connect, send a WhatsApp text with what the call was about instead of dropping it silently."
+  voice_fallback_message:
+    type: str
+    default: ""
+    label: "Fallback message text"
+    description: "Sent instead of the automatic one when a call isn't picked up, declined or fails. Blank: a message built from the call's reason and details."
   voice_tools:
     type: str
     default: "memory, session_search, skills_list, skill_view, web_search, web_extract, read_file, search_files, todo_list, hindsight_recall, hindsight_retain, hindsight_reflect"

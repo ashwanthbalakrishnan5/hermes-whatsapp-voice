@@ -35,6 +35,8 @@ Restart the sidecar after a change: the dashboard's **Restart sidecar** button, 
 | `record_calls` | `false` | Save your side of each call as `recordings/<call id>.wav` in the plugin's data folder (this machine only) |
 | `answer_inbound` | `true` | Answer calls from `owner_number` |
 | `send_summary` | `true` | Message a summary after each call |
+| `voice_fallback_enabled` | `true` | Message you on WhatsApp when an outgoing call isn't picked up, is declined or fails to connect, with what it was about |
+| `voice_fallback_message` | empty | Text to send instead of the automatic fallback message; blank builds one from the call's reason and details |
 | `listen` | `127.0.0.1:8796` | Sidecar API address (loopback) |
 | `context_listen` | `127.0.0.1:8797` | `core_session` service address (loopback) |
 | `voice_api_url` | Gemini Live endpoint | Advanced: the Live API WebSocket URL, for a proxy. The Gemini key is sent there |

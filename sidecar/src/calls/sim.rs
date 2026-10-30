@@ -408,6 +408,8 @@ fn test_config(gemini_url: &str, hermes_url: &str) -> Config {
         recordings: None,
         answer_inbound: true,
         send_summary: true,
+        voice_fallback_enabled: true,
+        voice_fallback_message: String::new(),
         context_url: String::new(),
         vocabulary: vec![],
     }

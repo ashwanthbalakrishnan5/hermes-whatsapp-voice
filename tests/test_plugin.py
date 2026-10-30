@@ -113,6 +113,8 @@ def test_sidecar_env(plugin):
     assert env["HWV_OWNER"] == "+1 555 123 4567"
     assert env["HWV_ANSWER_INBOUND"] == "false"
     assert env["HWV_SEND_SUMMARY"] == "true"
+    assert env["HWV_VOICE_FALLBACK_ENABLED"] == "true"
+    assert env["HWV_VOICE_FALLBACK_MESSAGE"] == ""
     assert env["HWV_MAX_DURATION"] == "5m"
     assert env["HWV_RING_TIMEOUT"] == "45s"
     assert env["HWV_LIVE_CONFIG"] == "{}"

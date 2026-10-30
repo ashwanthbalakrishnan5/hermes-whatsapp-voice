@@ -571,9 +571,9 @@ impl Bridge {
 
     pub async fn run_outbound(self: Arc<Self>, id: String, reason: String, details: String) {
         let Some(client) = self.client.clone() else {
-            return self
-                .calls
+            self.calls
                 .finish(&id, Status::Failed, "WhatsApp is not connected");
+            return self.send_voice_fallback(&id, &reason, &details).await;
         };
         let (mic_tx, mic_rx) = async_channel::bounded::<Vec<i16>>(8);
         let (spk_tx, spk_rx) = async_channel::bounded::<Vec<i16>>(64);
@@ -600,7 +600,7 @@ impl Bridge {
         };
         self.ring_signals.stop();
         let (Ok(handle), true) = (started, answered) else {
-            return;
+            return self.send_voice_fallback(&id, &reason, &details).await;
         };
         let info = CallInfo::outbound(reason, details);
         self.converse(&id, &handle, mic_tx, spk_rx, info).await;
@@ -1097,6 +1097,20 @@ impl Bridge {
         self.message_owner(id, text).await;
     }
 
+    /// When an outbound call ends without connecting (no answer, declined, or failed to place),
+    /// message the owner instead of dropping whatever the call was about.
+    async fn send_voice_fallback(&self, id: &str, reason: &str, details: &str) {
+        if !self.cfg.voice_fallback_enabled {
+            return;
+        }
+        let Some(status) = self.calls.get(id).map(|r| r.status) else {
+            return;
+        };
+        if let Some(text) = fallback_text(status, reason, details, &self.cfg.voice_fallback_message) {
+            self.message_owner(id, text).await;
+        }
+    }
+
     async fn message_owner(&self, id: &str, text: String) {
         let Some(client) = &self.client else { return };
         if let Err(e) = client
@@ -1221,6 +1235,25 @@ async fn write_back(
             Err(e) => log::warn!("could not save call events: {e:#}"),
         }
     }
+}
+
+/// Text for the fallback WhatsApp message after an outbound call that never connected; None for
+/// any other status (the normal call summary covers those).
+fn fallback_text(status: Status, reason: &str, details: &str, custom: &str) -> Option<String> {
+    let why = match status {
+        Status::NoAnswer => "you didn't pick up",
+        Status::Rejected => "the call was declined",
+        Status::Failed => "I couldn't reach you by call",
+        _ => return None,
+    };
+    if !custom.trim().is_empty() {
+        return Some(custom.to_string());
+    }
+    let mut text = format!("📞 Missed call ({why}). I was calling about: {reason}");
+    if !details.is_empty() {
+        text.push_str(&format!("\n{details}"));
+    }
+    Some(text)
 }
 
 fn truncate(s: &str, max: usize) -> String {
@@ -1399,5 +1432,31 @@ mod tests {
     fn truncates_on_char_boundary() {
         assert_eq!(truncate("héllo", 2), "hé…");
         assert_eq!(truncate("hi", 5), "hi");
+    }
+
+    #[test]
+    fn fallback_text_covers_unanswered_declined_and_failed_calls() {
+        assert_eq!(
+            fallback_text(Status::InProgress, "r", "", ""),
+            None,
+            "a connected call gets no fallback message"
+        );
+        let t = fallback_text(Status::NoAnswer, "pay rent", "amount: $1200", "").unwrap();
+        assert!(t.contains("didn't pick up") && t.contains("pay rent") && t.contains("$1200"));
+        assert!(
+            fallback_text(Status::Rejected, "r", "", "")
+                .unwrap()
+                .contains("declined")
+        );
+        assert!(
+            fallback_text(Status::Failed, "r", "", "")
+                .unwrap()
+                .contains("reach you")
+        );
+        assert_eq!(
+            fallback_text(Status::NoAnswer, "r", "d", "custom text").unwrap(),
+            "custom text",
+            "a custom message overrides the automatic one"
+        );
     }
 }
