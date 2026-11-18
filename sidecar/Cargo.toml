@@ -10,7 +10,7 @@ publish = false
 
 [dependencies]
 # Pinned: the VoIP API moves quickly upstream.
-whatsapp-rust = { git = "https://github.com/oxidezap/whatsapp-rust", rev = "135e1aebf9d62c06da17ae4516a90554a472c60e", features = ["voip"] }
+whatsapp-rust = { git = "https://github.com/oxidezap/whatsapp-rust", rev = "9b9fdb7e5c4211cdc7c837abb6a9ae9c597e35c5", features = ["voip"] }
 anyhow = "1"
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio", "query"] }
 base64 = "0.22"
